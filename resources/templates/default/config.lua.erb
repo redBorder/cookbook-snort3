@@ -1,0 +1,270 @@
+---------------------------------------------------------------------------
+-- Snort++ configuration
+---------------------------------------------------------------------------
+
+daq = {
+    module_dirs = {
+        "/usr/lib64/daq"
+    }
+}
+
+---------------------------------------------------------------------------
+-- 1. configure defaults
+---------------------------------------------------------------------------
+
+include '/etc/snort/<%=@instance_name%>/snort-variables.conf'
+
+---------------------------------------------------------------------------
+-- 2. configure inspection
+---------------------------------------------------------------------------
+
+-- mod = { } uses internal defaults
+-- you can see them with snort --help-module mod
+
+-- mod = default_mod uses external defaults
+-- you can see them in snort_defaults.lua
+
+-- the following are quite capable with defaults:
+
+stream = { }
+stream_ip = { }
+stream_icmp = { }
+stream_tcp = { }
+stream_udp = { }
+stream_user = { }
+stream_file = { }
+
+arp_spoof = { }
+back_orifice = { }
+dns = { }
+imap = { }
+netflow = {}
+normalizer = { }
+pop = { }
+rpc_decode = { }
+sip = { }
+ssh = { }
+ssl = { }
+telnet = { }
+
+cip = { }
+dnp3 = { }
+iec104 = { }
+mms = { }
+modbus = { }
+s7commplus = { }
+
+dce_smb = { }
+dce_tcp = { }
+dce_udp = { }
+dce_http_proxy = { }
+dce_http_server = { }
+
+--gtp_inspect = default_gtp
+port_scan = default_med_port_scan
+--smtp = default_smtp
+
+--ftp_server = default_ftp_server
+ftp_client = { }
+ftp_data = { }
+
+http_inspect = { }
+http2_inspect = { }
+
+---------------------------------------------------------------------------
+-- 3. configure bindings
+---------------------------------------------------------------------------
+
+--wizard = default_wizard
+
+binder =
+{
+    -- port bindings required for protocols without wizard support
+    { when = { proto = 'udp', ports = '53', role='server' },  use = { type = 'dns' } },
+    { when = { proto = 'tcp', ports = '53', role='server' },  use = { type = 'dns' } },
+    { when = { proto = 'tcp', ports = '111', role='server' }, use = { type = 'rpc_decode' } },
+    { when = { proto = 'tcp', ports = '502', role='server' }, use = { type = 'modbus' } },
+--    { when = { proto = 'tcp', ports = '2123 2152 3386', role='server' }, use = { type = 'gtp_inspect' } },
+    { when = { proto = 'tcp', ports = '2404', role='server' }, use = { type = 'iec104' } },
+    { when = { proto = 'udp', ports = '2222', role = 'server' }, use = { type = 'cip' } },
+    { when = { proto = 'tcp', ports = '44818', role = 'server' }, use = { type = 'cip' } },
+
+    { when = { proto = 'tcp', service = 'dcerpc' },  use = { type = 'dce_tcp' } },
+    { when = { proto = 'udp', service = 'dcerpc' },  use = { type = 'dce_udp' } },
+    { when = { proto = 'udp', service = 'netflow' }, use = { type = 'netflow' } },
+
+    { when = { service = 'netbios-ssn' },      use = { type = 'dce_smb' } },
+    { when = { service = 'dce_http_server' },  use = { type = 'dce_http_server' } },
+    { when = { service = 'dce_http_proxy' },   use = { type = 'dce_http_proxy' } },
+
+    { when = { service = 'cip' },              use = { type = 'cip' } },
+    { when = { service = 'dnp3' },             use = { type = 'dnp3' } },
+    { when = { service = 'dns' },              use = { type = 'dns' } },
+--  { when = { service = 'ftp' },              use = { type = 'ftp_server' } },
+    { when = { service = 'ftp-data' },         use = { type = 'ftp_data' } },
+--    { when = { service = 'gtp' },              use = { type = 'gtp_inspect' } },
+    { when = { service = 'imap' },             use = { type = 'imap' } },
+    { when = { service = 'http' },             use = { type = 'http_inspect' } },
+    { when = { service = 'http2' },            use = { type = 'http2_inspect' } },
+    { when = { service = 'iec104' },           use = { type = 'iec104' } },
+    { when = { service = 'mms' },              use = { type = 'mms' } },
+    { when = { service = 'modbus' },           use = { type = 'modbus' } },
+    { when = { service = 'pop3' },             use = { type = 'pop' } },
+    { when = { service = 'ssh' },              use = { type = 'ssh' } },
+    { when = { service = 'sip' },              use = { type = 'sip' } },
+--    { when = { service = 'smtp' },             use = { type = 'smtp' } },
+    { when = { service = 'ssl' },              use = { type = 'ssl' } },
+    { when = { service = 'sunrpc' },           use = { type = 'rpc_decode' } },
+    { when = { service = 's7commplus' },       use = { type = 's7commplus' } },
+    { when = { service = 'telnet' },           use = { type = 'telnet' } },
+
+  --  { use = { type = 'wizard' } }
+}
+
+---------------------------------------------------------------------------
+-- 4. configure performance
+---------------------------------------------------------------------------
+
+-- use latency to monitor / enforce packet and rule thresholds
+--latency = { }
+
+-- use these to capture perf data for analysis and tuning
+--profiler = { }
+--perf_monitor = { }
+
+---------------------------------------------------------------------------
+-- 5. configure detection
+---------------------------------------------------------------------------
+
+references = default_references
+classifications = default_classifications
+
+ips =
+{
+    variables =
+    {
+        nets =
+        {
+            EXTERNAL_NET = EXTERNAL_NET,
+            HOME_NET = HOME_NET,
+            HTTP_SERVERS = HTTP_SERVERS,
+            SMTP_SERVERS = SMTP_SERVERS,
+            SQL_SERVERS = SQL_SERVERS,
+            DNS_SERVERS = DNS_SERVERS,
+            TELNET_SERVERS = TELNET_SERVERS,
+            AIM_SERVERS = AIM_SERVERS,
+            SIP_SERVERS = SIP_SERVERS,
+            DNP3_SERVER = DNP3_SERVER,
+            MODBUS_SERVER = MODBUS_SERVER,
+            ENIP_SERVER = ENIP_SERVER,
+        },
+        ports =
+        {
+            HTTP_PORTS = HTTP_PORTS,
+            FTP_PORTS = FTP_PORTS,
+            SSH_PORTS = SSH_PORTS,
+            FILE_DATA_PORTS = FILE_DATA_PORTS,
+            SIP_PORTS = SIP_PORTS,
+            DNP3_PORTS = DNP3_PORTS,
+            ORACLE_PORTS = ORACLE_PORTS,
+            SHELLCODE_PORTS = SHELLCODE_PORTS,
+        }
+    }
+}
+
+-- use these to configure additional rule actions
+-- react = { }
+-- reject = { }
+
+-- use this to enable payload injection utility
+-- payload_injector = { }
+
+---------------------------------------------------------------------------
+-- 6. configure filters
+---------------------------------------------------------------------------
+
+-- below are examples of filters
+-- each table is a list of records
+
+--[[
+suppress =
+{
+    -- don't want to any of see these
+    { gid = 1, sid = 1 },
+
+    -- don't want to see anything for a given host
+    { track = 'by_dst', ip = '1.2.3.4' }
+
+    -- don't want to see these for a given host
+    { gid = 1, sid = 2, track = 'by_dst', ip = '1.2.3.4' },
+}
+--]]
+
+--[[
+event_filter =
+{
+    -- reduce the number of events logged for some rules
+    { gid = 1, sid = 1, type = 'limit', track = 'by_src', count = 2, seconds = 10 },
+    { gid = 1, sid = 2, type = 'both',  track = 'by_dst', count = 5, seconds = 60 },
+}
+--]]
+
+--[[
+rate_filter =
+{
+    -- alert on connection attempts from clients in SOME_NET
+    { gid = 135, sid = 1, track = 'by_src', count = 5, seconds = 1,
+      new_action = 'alert', timeout = 4, apply_to = '[$SOME_NET]' },
+
+    -- alert on connections to servers over threshold
+    { gid = 135, sid = 2, track = 'by_dst', count = 29, seconds = 3,
+      new_action = 'alert', timeout = 1 },
+}
+--]]
+
+---------------------------------------------------------------------------
+-- 7. configure outputs
+---------------------------------------------------------------------------
+
+<% if !@sensor_id.nil? and @sensor_id > 0 and !node["redborder"]["sensor_uuid"].nil? %>
+<%
+  # Prepare the 'out' variable with dynamic fields
+  out = [
+    "deployment", "deployment_uuid", "namespace", "namespace_uuid", "market", "market_uuid",
+    "organization", "organization_uuid", "service_provider", "service_provider_uuid"
+  ].map { |x| @group[x].nil? ? "" : "\"#{x}\":\"#{@group[x].to_s}\"" }
+  .select { |x| x != "" }
+  .join(",")
+%>
+
+<%
+  enrichment_json = "{"
+  enrichment_json += out unless out.nil? || out.empty?
+  enrichment_json += "," unless out.nil? || out.empty?
+  enrichment_json += "\"sensor_uuid\":\"#{node['redborder']['sensor_uuid']}\","
+  enrichment_json += "\"sensor_name\":\"#{node['rbname']}\","
+  enrichment_json += "\"group_uuid\":\"#{@group['group_uuid'].nil? ? '0' : @group['group_uuid']}\","
+  enrichment_json += "\"group_name\":\"#{@name.nil? ? 'default' : @name}\","
+  enrichment_json += "\"sensor_type\":\"ips\","
+  enrichment_json += "\"domain_name\":\"#{@group['domain_name'].nil? ? '0' : @group['domain_name']}\","
+  enrichment_json += "\"sensor_ip\":\"#{node['ipaddress']}\""
+  enrichment_json += "}"
+%>
+
+<% end %>
+alert_kafka = {
+    topic = 'rb_event',
+    broker_host = 'kafka.service:9092',
+    enrichment = '<%=enrichment_json%>',
+    fields = 'src dst priority src_country_code dst_country_code sig_id ethlength_range sig_generator action msg class src_port dst_port eth_dst_mac eth_src_mac eth_dst eth_src vlan iplen udplen'
+}
+
+---------------------------------------------------------------------------
+-- 8. configure tweaks
+---------------------------------------------------------------------------
+
+if ( tweaks ~= nil ) then
+    include(tweaks .. '.lua')
+end
+
+
