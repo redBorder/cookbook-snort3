@@ -1,17 +1,17 @@
-# Snort Cookbook
+# Snort3 Cookbook
 [![Build Status][build-shield]][build-url]
 [![Linters][linters-shield]][linters-url]
 [![License][license-shield]][license-url]
 
 <!-- Badges -->
-[build-shield]: https://github.com/redBorder/cookbook-snort/actions/workflows/rpm.yml/badge.svg?branch=master
-[build-url]: https://github.com/redBorder/cookbook-snort/actions/workflows/rpm.yml?query=branch%3Amaster
-[linters-shield]: https://github.com/redBorder/cookbook-snort/actions/workflows/lint.yml/badge.svg?event=push
-[linters-url]: https://github.com/redBorder/cookbook-snort/actions/workflows/lint.yml
+[build-shield]: https://github.com/redBorder/cookbook-snort3/actions/workflows/rpm.yml/badge.svg?branch=master
+[build-url]: https://github.com/redBorder/cookbook-snort3/actions/workflows/rpm.yml?query=branch%3Amaster
+[linters-shield]: https://github.com/redBorder/cookbook-snort3/actions/workflows/lint.yml/badge.svg?event=push
+[linters-url]: https://github.com/redBorder/cookbook-snort3/actions/workflows/lint.yml
 [license-shield]: https://img.shields.io/badge/license-AGPLv3-blue.svg
-[license-url]: https://github.com/cookbook-snort/blob/HEAD/LICENSE
+[license-url]: https://github.com/cookbook-snort3/blob/HEAD/LICENSE
 
-Chef cookbook to install and configure snort service in redborder environments
+Chef cookbook to install and configure snort3 service in redborder environments
 
 ### Platforms
 
