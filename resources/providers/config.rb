@@ -6,7 +6,7 @@ action :add do
     sensor_id = new_resource.sensor_id
     groups = new_resource.groups
 
-    dnf_package 'snort' do
+    dnf_package 'snort3' do
       action :upgrade
       flush_cache [:before]
     end
