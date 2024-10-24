@@ -116,10 +116,37 @@ action :add do
 
       end
     end
+
+    ruby_block 'check_running_snort3_services' do
+      block do
+        running_services = `systemctl list-units --type=service --state=running | grep snort3 | awk '{print $1}'`.split("\n")
+        invalid_services = running_services - valid_instance_names
+
+        Chef::Log.info("Running snort3 services: #{running_services}")
+        Chef::Log.info("Invalid snort3 services: #{invalid_services}")
+
+        invalid_services.each do |invalid_service|
+          next if invalid_service.empty?
+
+          service_name = invalid_service.gsub('.service', '')
+          system("systemctl stop #{service_name}")
+          system("systemctl disable #{service_name}")
+
+          Chef::Log.info("Stopped and disabled invalid service: #{service_name}")
+        end
+      end
+      action :run
+    end
+
     ruby_block 'cleanup_old_snort3_systemd_services' do
       block do
         existing_service_files = []
         dir_path = "/sys/fs/cgroup/system.slice/system-snort3.slice/"
+
+        unless Dir.exist?(dir_path)
+            Chef::Log.info("Directory #{dir_path} does not exist. Skipping cleanup of old Snort 3 services.")
+            next
+          end
 
         entries = Dir.entries(dir_path)
         pattern = /^snort3@\w+\.service$/
