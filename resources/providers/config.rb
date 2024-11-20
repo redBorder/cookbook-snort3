@@ -6,6 +6,35 @@ action :add do
     sensor_id = new_resource.sensor_id
     groups = new_resource.groups
 
+    # temporary until we configure selinux
+    ruby_block 'set_enforce_0' do
+      block do
+        selinux_status = `getenforce`
+        
+        if selinux_status.strip != 'Permissive'
+          Chef::Log.warn('Setting SELinux to permissive mode...')
+          system('setenforce 0')
+        else
+          Chef::Log.info('SELinux is already in permissive mode.')
+        end
+      end
+      action :run
+    end
+
+    ruby_block 'check_bpctl_mod' do
+      block do
+        module_loaded = `lsmod | grep bpctl_mod`
+        
+        unless module_loaded.strip.empty?
+          Chef::Log.info('bpctl_mod is already loaded.')
+        else
+          Chef::Log.warn('bpctl_mod is not loaded. injecting the module...')
+          system('bpctl_start')
+        end
+      end
+      action :run
+    end
+
     dnf_package 'snort3' do
       action :upgrade
       flush_cache [:before]
@@ -29,7 +58,7 @@ action :add do
         valid_instance_names << "snort3@#{instance_name}.service"
 
         service "snort3@#{instance_name}.service" do
-          action :nothing
+          action [:enable]
         end
 
         %w(reload restart stop start).each do |s_action|
@@ -74,22 +103,21 @@ action :add do
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
 
-        iface = `ip link show master #{group['segments'].join(' ')} | grep '^[0-9]' | awk '{print $2}' | cut -d':' -f1 | paste -sd ":"`
+        iface = `ip link show master #{group['segments'].join(' ')} | grep '^[0-9]' | awk '{print $2}' | cut -d':' -f1 | paste -sd ":"`.chomp!
         threads = group["cpu_list"].size * 2
         cpu_cores = group["cpu_list"].join(' ')
         mode = group["mode"]
-        inline = if group["mode"] != "IDS" and group["mode"] != "IDS_SPAN" and group["mode"] != "IDS_FWD"
-                   true
-                  else
-                    false
-                  end
-
+        inline = (mode != "IDS" && mode != "IDS_SPAN") && (mode == "IPS" || mode == "IDS_FWD" || mode == "IPS_TEST")
         args = if inline
-                 "-Q --daq afpacket --daq-var fanout_type=hash -i #{iface}"
-               else
-                 "--daq afpacket --daq-var fanout_type=hash -i #{iface}"
-               end 
-
+                  args = "--daq afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}" # IPS_TEST
+                  args = "#{args} --treat-drop-as-alert" if mode == "IDS_FWD" || mode == "IDS"
+                  args
+                else
+                    args = "--daq afpacket --daq-var fanout_type=hash -i #{iface}"
+                    args = "#{args} --treat-drop-as-alert" if mode == "IDS_SPAN" || mode
+                    args
+                end
+        args = "-Q #{args}" if mode == "IPS"
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
           cookbook 'snort3'
