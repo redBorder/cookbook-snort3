@@ -10,7 +10,7 @@ action :add do
     ruby_block 'set_enforce_0' do
       block do
         selinux_status = `getenforce`
-        
+
         if selinux_status.strip != 'Permissive'
           Chef::Log.warn('Setting SELinux to permissive mode...')
           system('setenforce 0')
@@ -24,12 +24,12 @@ action :add do
     ruby_block 'check_bpctl_mod' do
       block do
         module_loaded = `lsmod | grep bpctl_mod`
-        
-        unless module_loaded.strip.empty?
-          Chef::Log.info('bpctl_mod is already loaded.')
-        else
+
+        if module_loaded.strip.empty?
           Chef::Log.warn('bpctl_mod is not loaded. injecting the module...')
           system('bpctl_start')
+        else
+          Chef::Log.info('bpctl_mod is already loaded.')
         end
       end
       action :run
@@ -43,7 +43,6 @@ action :add do
     valid_instance_names = []
 
     groups.each do |group|
-
       name = group['name']
 
       bindings = group['bindings'].keys.map(&:to_i).sort
@@ -104,20 +103,19 @@ action :add do
         end
 
         iface = `ip link show master #{group['segments'].join(' ')} | grep '^[0-9]' | awk '{print $2}' | cut -d':' -f1 | paste -sd ":"`.chomp!
-        threads = group["cpu_list"].size * 2
-        cpu_cores = group["cpu_list"].join(' ')
-        mode = group["mode"]
-        inline = (mode != "IDS" && mode != "IDS_SPAN") && (mode == "IPS" || mode == "IDS_FWD" || mode == "IPS_TEST")
+        threads = group['cpu_list'].size * 2
+        cpu_cores = group['cpu_list'].join(' ')
+        mode = group['mode']
+        inline = (mode != 'IDS' && mode != 'IDS_SPAN') && (mode == 'IPS' || mode == 'IDS_FWD' || mode == 'IPS_TEST')
         args = if inline
-                  args = "--daq afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}" # IPS_TEST
-                  args = "#{args} --treat-drop-as-alert" if mode == "IDS_FWD" || mode == "IDS"
-                  args
-                else
-                    args = "--daq afpacket --daq-var fanout_type=hash -i #{iface}"
-                    args = "#{args} --treat-drop-as-alert" if mode == "IDS_SPAN" || mode
-                    args
-                end
-        args = "-Q #{args}" if mode == "IPS"
+                 args = "--daq afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}" # IPS_TEST
+                 args = "#{args} --treat-drop-as-alert" if mode == 'IDS_FWD' || mode == 'IDS'
+               else
+                 args = "--daq afpacket --daq-var fanout_type=hash -i #{iface}"
+                 args = "#{args} --treat-drop-as-alert" if mode == 'IDS_SPAN' || mode
+               end
+        args
+        args = "-Q #{args}" if mode == 'IPS'
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
           cookbook 'snort3'
@@ -141,7 +139,6 @@ action :add do
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
-
       end
     end
 
@@ -169,12 +166,12 @@ action :add do
     ruby_block 'cleanup_old_snort3_systemd_services' do
       block do
         existing_service_files = []
-        dir_path = "/sys/fs/cgroup/system.slice/system-snort3.slice/"
+        dir_path = '/sys/fs/cgroup/system.slice/system-snort3.slice/'
 
         unless Dir.exist?(dir_path)
-            Chef::Log.info("Directory #{dir_path} does not exist. Skipping cleanup of old Snort 3 services.")
-            next
-          end
+          Chef::Log.info("Directory #{dir_path} does not exist. Skipping cleanup of old Snort 3 services.")
+          next
+        end
 
         entries = Dir.entries(dir_path)
         pattern = /^snort3@\w+\.service$/
@@ -211,4 +208,3 @@ action :remove do
     Chef::Log.error(e.message)
   end
 end
-
