@@ -114,7 +114,7 @@ action :add do
                  args = "--daq afpacket --daq-var fanout_type=hash -i #{iface}"
                  args = "#{args} --treat-drop-as-alert" if mode == 'IDS_SPAN' || mode
                end
-        args
+
         args = "-Q #{args}" if mode == 'IPS'
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
