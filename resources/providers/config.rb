@@ -110,9 +110,11 @@ action :add do
         args = if inline
                  args = "--daq afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}" # IPS_TEST
                  args = "#{args} --treat-drop-as-alert" if mode == 'IDS_FWD' || mode == 'IDS'
+                 args
                else
                  args = "--daq afpacket --daq-var fanout_type=hash -i #{iface}"
                  args = "#{args} --treat-drop-as-alert" if mode == 'IDS_SPAN' || mode
+                 args
                end
 
         args = "-Q #{args}" if mode == 'IPS'
