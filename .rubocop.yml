@@ -1,0 +1,6 @@
+Chef/Deprecations/ResourceWithoutUnifiedTrue:
+  Enabled: false
+
+Style/IdenticalConditionalBranches:
+  Enabled: false
+
