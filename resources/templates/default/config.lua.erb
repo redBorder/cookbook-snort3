@@ -256,26 +256,30 @@ rate_filter =
 <%#— pick mode based on cloud flag —%>
 <% if node["redborder"]["cloud"] == true || node["redborder"]["cloud"].to_s == "1" %>
 
-# === HTTP output plugin ===
+---------------------------------------------------------------------------
+--- HTTP output plugin
+---------------------------------------------------------------------------
+
 alert_http = {
     http_endpoint =  "https://http2k.<%= node["redborder"]["cdomain"] %>/rbdata/<%= node["redborder"]["sensor_uuid"] %>/rb_event",
     verify_ssl =     false,
-    enrichment =    "<%= enrichment_json %>",
+    enrichment =    '<%= enrichment_json %>',
     fields = 'src dst priority src_country_code dst_country_code sig_id ethlength_range sig_generator action msg class src_port dst_port eth_dst_mac eth_src_mac eth_dst eth_src vlan iplen udplen'
-
 }
 
 <% else %>
 
-# === Kafka output plugin ===
+---------------------------------------------------------------------------
+--- kafka output plugin
+---------------------------------------------------------------------------
+
 alert_kafka = {
     topic =         "rb_event",
     broker_host =   "kafka.<%= node["redborder"]["cdomain"] %>:9092",
-    enrichment =    "<%= enrichment_json %>",
+    enrichment =    '<%= enrichment_json %>',
     fields = 'src dst priority src_country_code dst_country_code sig_id ethlength_range sig_generator action msg class src_port dst_port eth_dst_mac eth_src_mac eth_dst eth_src vlan iplen udplen'
 }
 
-<% end %>
 <% end %>
 ---------------------------------------------------------------------------
 -- 8. configure tweaks
