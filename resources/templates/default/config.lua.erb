@@ -252,57 +252,27 @@ rate_filter =
 %>
 
 <% end %>
-<%#— only enable if we have a valid sensor id/UUID —%>
-<% if !@sensor_id.nil? && @sensor_id > 0 && !node["redborder"]["sensor_uuid"].nil? %>
-
-<%#— build up all the optional group fields into a JSON fragment —%>
-<% out = [
-     "deployment", "deployment_uuid", "namespace", "namespace_uuid",
-     "market", "market_uuid", "organization", "organization_uuid",
-     "service_provider", "service_provider_uuid"
-   ].map { |f|
-     if @group[f]
-       %Q("#{f}":"#{@group[f].to_s.gsub(" ","\\ ")}")
-     end
-   }.compact.join(",") %>
-
-<%#— assemble the full enrichment JSON —%>
-<% enrichment_json = [
-     out,
-     %Q("sensor_uuid":"#{node["redborder"]["sensor_uuid"]}"),
-     %Q("sensor_name":"#{@name || node["rbname"]}"),
-     %Q("group_uuid":"#{@group["group_uuid"] || 0}"),
-     %Q("group_name":"#{@name || "default"}"),
-     %Q("sensor_type":"ips"),
-     %Q("domain_name":"#{@group["domain_name"] || 0}"),
-     %Q("sensor_ip":"#{node["ipaddress"]}")
-   ].reject(&:empty?).join(",") %>
 
 <%#— pick mode based on cloud flag —%>
 <% if node["redborder"]["cloud"] == true || node["redborder"]["cloud"].to_s == "1" %>
 
 # === HTTP output plugin ===
-alert_http: {
-    http_endpoint:  "https://http2k.<%= node["redborder"]["cdomain"] %>/rbdata/<%= node["redborder"]["sensor_uuid"] %>/rb_event",
-    verify_ssl:     false,
-    enrichment:     "<%= enrichment_json %>",
-    fields:         ["src","dst","priority","src_country_code","dst_country_code",
-                     "sig_id","ethlength_range","sig_generator","action","msg","class",
-                     "src_port","dst_port","eth_dst_mac","eth_src_mac","eth_dst","eth_src",
-                     "vlan","iplen","udplen"],
+alert_http = {
+    http_endpoint =  "https://http2k.<%= node["redborder"]["cdomain"] %>/rbdata/<%= node["redborder"]["sensor_uuid"] %>/rb_event",
+    verify_ssl =     false,
+    enrichment =    "<%= enrichment_json %>",
+    fields = 'src dst priority src_country_code dst_country_code sig_id ethlength_range sig_generator action msg class src_port dst_port eth_dst_mac eth_src_mac eth_dst eth_src vlan iplen udplen'
+
 }
 
 <% else %>
 
 # === Kafka output plugin ===
-alert_kafka: {
-    topic:         "rb_event",
-    broker_host:   "kafka.<%= node["redborder"]["cdomain"] %>:9092",
-    enrichment:    "<%= enrichment_json %>",
-    fields:        ["src","dst","priority","src_country_code","dst_country_code",
-                    "sig_id","ethlength_range","sig_generator","action","msg","class",
-                    "src_port","dst_port","eth_dst_mac","eth_src_mac","eth_dst","eth_src",
-                    "vlan","iplen","udplen"]
+alert_kafka = {
+    topic =         "rb_event",
+    broker_host =   "kafka.<%= node["redborder"]["cdomain"] %>:9092",
+    enrichment =    "<%= enrichment_json %>",
+    fields = 'src dst priority src_country_code dst_country_code sig_id ethlength_range sig_generator action msg class src_port dst_port eth_dst_mac eth_src_mac eth_dst eth_src vlan iplen udplen'
 }
 
 <% end %>
