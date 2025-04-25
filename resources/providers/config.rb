@@ -118,6 +118,14 @@ action :add do
                end
 
         args = "-Q #{args}" if mode == 'IPS'
+
+        output_plugin = ''
+        output_plugin = if node['redborder']['cloud'] == true || node['redborder']['cloud'].to_s == '1'
+                          'alert_http'
+                        else
+                          'alert_kafka'
+                        end
+
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
           cookbook 'snort3'
@@ -125,7 +133,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(iface: iface, cpu_cores: cpu_cores, threads: threads, mode: mode, inline: inline, args: args)
+          variables(iface: iface, cpu_cores: cpu_cores, threads: threads, mode: mode, inline: inline, args: args, output_plugin: output_plugin)
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
