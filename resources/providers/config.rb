@@ -119,12 +119,12 @@ action :add do
 
         args = "-Q #{args}" if mode == 'IPS'
 
-        output_plugin = ""
-        if node["redborder"]["cloud"] == true || node["redborder"]["cloud"].to_s == "1"
-          output_plugin = "alert_http"
-        else
-          output_plugin = "alert_kafka"
-        end
+        output_plugin = ''
+        output_plugin = if node['redborder']['cloud'] == true || node['redborder']['cloud'].to_s == '1'
+                          'alert_http'
+                        else
+                          'alert_kafka'
+                        end
 
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
