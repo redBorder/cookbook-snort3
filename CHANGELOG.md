@@ -1,6 +1,15 @@
 cookbook-snort3 CHANGELOG
 ===============
 
+## 0.1.0
+
+  - Miguel Alvarez
+    - [8db07b2] Delete pkgs & SOURCES
+    - [ba4adfc] Add output plugin
+    - [e6042b8] Fix new modes
+    - [5280313] Fix alert_http
+    - [52db33d] Add intrusion proxy mode sending
+
 0.0.1
 -----
 - [Miguel Álvarez <malvarez@redborder.com>]
