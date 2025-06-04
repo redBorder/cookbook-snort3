@@ -145,6 +145,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
+          not_if { ::File.exist?("/etc/snort/#{instance_name}/snort.rules") && !::File.zero?("/etc/snort/#{instance_name}/snort.rules") }
         end
 
         template "/etc/snort/#{instance_name}/snort-variables.conf" do
