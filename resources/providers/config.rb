@@ -113,20 +113,20 @@ action :add do
             src_dir = '/etc/snort/0_default_0'
             raw_dir = "#{src_dir}/raw"
             dest_dir = "#{raw_dir}/#{timestamp}"
-        
+
             system(<<-EOS
               mkdir -p "#{dest_dir}"
               cd "#{src_dir}" || exit 1
-        
+
               for file in *_alert_full.txt; do
                 [ -e "$file" ] || continue
-        
+
                 base_name="$(basename "$file")"
                 name="${base_name%.*}"
                 ext="${base_name##*.}"
-        
+
                 dest_file="#{dest_dir}/$base_name"
-        
+
                 if [ -e "$dest_file" ]; then
                   i=1
                   while [ -e "#{dest_dir}/$name_$i.$ext" ]; do
@@ -134,18 +134,18 @@ action :add do
                   done
                   dest_file="#{dest_dir}/$name_$i.$ext"
                 fi
-        
+
                 cp -f "$file" "$dest_file"
                 : > "$file"
                 echo "Copied $file to $dest_file and truncated original"
               done
-        
+
               find "#{dest_dir}" -type f -size 0 -name '*.txt' -delete
             EOS
-            )
+                  )
           end
           action :run
-        end        
+        end
 
         begin
           sensor_id = node['redborder']['sensor_id'].to_i
