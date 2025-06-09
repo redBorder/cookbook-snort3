@@ -43,17 +43,40 @@ action :add do
     valid_instance_names = []
 
     groups.each do |group|
-      name = group['name']
+      group_name = group['name']
+      default_added = false
+      group['bindings']
+        .keys
+        .map(&:to_i)
+        .sort
+        .map(&:to_s)
+        .each do |id_str|
+        vgroup         = group['bindings'][id_str].to_hash.clone
+        vgroup_name    = vgroup['name'].nil? ? 'default' : vgroup['name'].to_s
+        vgroup['name'] = vgroup_name
+        binding_id     = id_str.to_i
+        vgroup['id']   = binding_id
 
-      bindings = group['bindings'].keys.map(&:to_i).sort
+        has_vlans   = vgroup['vlan_objects'] && !vgroup['vlan_objects'].empty?
+        has_network = vgroup['network_objects'] && !vgroup['network_objects'].empty?
 
-      bindings.each do |binding_id|
-        vgroup = {}
-        vgroup['ipvars']        = node['redborder']['snort']['default']['ipvars']
-        vgroup['portvars']      = node['redborder']['snort']['default']['portvars']
+        if !has_vlans && !has_network
+          if default_added
+            next
+          else
+            default_added = true
+          end
+        end
+
+        if vgroup['ipvars'].nil? || vgroup['ipvars'].empty?
+          vgroup['ipvars'] = node['redborder']['snort']['default']['ipvars']
+        end
+
+        if vgroup['portvars'].nil? || vgroup['portvars'].empty?
+          vgroup['portvars'] = node['redborder']['snort']['default']['portvars']
+        end
 
         instance_name = "#{group['instances_group']}_#{group['name']}_#{binding_id}"
-
         valid_instance_names << "snort3@#{instance_name}.service"
 
         service "snort3@#{instance_name}.service" do
@@ -84,6 +107,46 @@ action :add do
           action :create
         end
 
+        ruby_block 'copy_alerts_with_full_date_hour_shell' do
+          block do
+            timestamp = Time.now.strftime('%Y-%m-%d_%H')
+            src_dir = '/etc/snort/0_default_0'
+            raw_dir = "#{src_dir}/raw"
+            dest_dir = "#{raw_dir}/#{timestamp}"
+
+            system(<<-EOS
+              mkdir -p "#{dest_dir}"
+              cd "#{src_dir}" || exit 1
+
+              for file in *_alert_full.txt; do
+                [ -e "$file" ] || continue
+
+                base_name="$(basename "$file")"
+                name="${base_name%.*}"
+                ext="${base_name##*.}"
+
+                dest_file="#{dest_dir}/$base_name"
+
+                if [ -e "$dest_file" ]; then
+                  i=1
+                  while [ -e "#{dest_dir}/$name_$i.$ext" ]; do
+                    i=$((i + 1))
+                  done
+                  dest_file="#{dest_dir}/$name_$i.$ext"
+                fi
+
+                cp -f "$file" "$dest_file"
+                : > "$file"
+                echo "Copied $file to $dest_file and truncated original"
+              done
+
+              find "#{dest_dir}" -type f -size 0 -name '*.txt' -delete
+            EOS
+                  )
+          end
+          action :run
+        end
+
         begin
           sensor_id = node['redborder']['sensor_id'].to_i
         rescue
@@ -97,7 +160,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(instance_name: instance_name, group: group, sensor_id: sensor_id, name: name)
+          variables(instance_name: instance_name, group: group, sensor_id: sensor_id, group_name: group_name)
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
