@@ -71,6 +71,15 @@ ftp_data = { }
 http_inspect = { }
 http2_inspect = { }
 
+reputation = {
+  allow = 'trust',
+  geoip_db_path = '/usr/share/GeoIP/GeoLite2-Country.mmdb',
+  geoip_manifest_path = '/etc/snort/<%=@instance_name%>/geoips/rbgeoip',
+  allowlist = '/etc/snort/<%=@instance_name%>/iplists/allowlist',
+  blocklist = '/etc/snort/<%=@instance_name%>/iplists/blacklist',
+  monitorlist = '/etc/snort/<%=@instance_name%>/iplists/monitorlist'
+}
+
 ---------------------------------------------------------------------------
 -- 3. configure bindings
 ---------------------------------------------------------------------------
@@ -273,7 +282,7 @@ alert_http = {
 --- kafka output plugin
 ---------------------------------------------------------------------------
 
-alert_kafka = 
+alert_kafka = {
     file = true,
     topic =         "rb_event",
     broker_host =   "kafka.<%= node["redborder"]["cdomain"] %>:9092",
@@ -289,5 +298,3 @@ alert_kafka =
 if ( tweaks ~= nil ) then
     include(tweaks .. '.lua')
 end
-
-

@@ -44,45 +44,58 @@ action :add do
 
     groups.each do |group|
       group_name = group['name']
-      default_added = false
-      group['bindings']
-        .keys
-        .map(&:to_i)
-        .sort
-        .map(&:to_s)
-        .each do |id_str|
-        vgroup         = group['bindings'][id_str].to_hash.clone
-        vgroup_name    = vgroup['name'].nil? ? 'default' : vgroup['name'].to_s
-        vgroup['name'] = vgroup_name
-        binding_id     = id_str.to_i
-        vgroup['id']   = binding_id
 
-        has_vlans   = vgroup['vlan_objects'] && !vgroup['vlan_objects'].empty?
-        has_network = vgroup['network_objects'] && !vgroup['network_objects'].empty?
+  puts "Processing group: #{group['name']}"
+  default_added = false
+  # Iterate over binding keys (as strings), sorted by integer value
+  group['bindings']
+       .keys
+       .map(&:to_i)
+       .sort
+       .map(&:to_s)
+       .each do |id_str|
 
-        if !has_vlans && !has_network
-          if default_added
-            next
-          else
-            default_added = true
-          end
-        end
+    vgroup         = group['bindings'][id_str].to_hash.clone
+    vgroup_name    = vgroup['name'].nil? ? 'default' : vgroup['name'].to_s
+    vgroup['name'] = vgroup_name
+    binding_id     = id_str.to_i
+    vgroup['id']   = binding_id
 
-        if vgroup['ipvars'].nil? || vgroup['ipvars'].empty?
-          vgroup['ipvars'] = node['redborder']['snort']['default']['ipvars']
-        end
+    # Check if both vlan_objects and network_objects are empty or nil
+    has_vlans   = vgroup['vlan_objects'] && !vgroup['vlan_objects'].empty?
+    has_network = vgroup['network_objects'] && !vgroup['network_objects'].empty?
 
-        if vgroup['portvars'].nil? || vgroup['portvars'].empty?
-          vgroup['portvars'] = node['redborder']['snort']['default']['portvars']
-        end
+    if !has_vlans && !has_network
+      if default_added
+        puts "Skipping additional empty binding #{binding_id} (already added default)"
+        next
+      else
+        puts "Adding default binding for #{binding_id}"
+        default_added = true
+      end
+    else
+      puts "Adding binding #{binding_id} with vlan/network objects"
+    end
 
-        instance_name = "#{group['instances_group']}_#{group['name']}_#{binding_id}"
-        valid_instance_names << "snort3@#{instance_name}.service"
+    # Only assign defaults if ipvars or portvars are missing/empty
+    if vgroup['ipvars'].nil? || vgroup['ipvars'].empty?
+      vgroup['ipvars'] = node['redborder']['snort']['default']['ipvars']
+      puts "Set default ipvars for binding #{binding_id}"
+    end
 
-        service "snort3@#{instance_name}.service" do
-          action [:enable]
-        end
+    if vgroup['portvars'].nil? || vgroup['portvars'].empty?
+      vgroup['portvars'] = node['redborder']['snort']['default']['portvars']
+      puts "Set default portvars for binding #{binding_id}"
+    end
 
+    # Build the instance name and enable the service
+    instance_name = "#{group['instances_group']}_#{group['name']}_#{binding_id}"
+    valid_instance_names << "snort3@#{instance_name}.service"
+    puts "Enabling service: snort3@#{instance_name}.service"
+
+    service "snort3@#{instance_name}.service" do
+      action [:enable]
+    end
         %w(reload restart stop start).each do |s_action|
           execute "#{s_action}_snort3@#{instance_name}" do
             command "/bin/env WAIT=1 /bin/systemctl #{s_action} snort3@#{instance_name}.service"
@@ -107,45 +120,49 @@ action :add do
           action :create
         end
 
-        ruby_block 'copy_alerts_with_full_date_hour_shell' do
-          block do
-            timestamp = Time.now.strftime('%Y-%m-%d_%H')
-            src_dir = '/etc/snort/0_default_0'
-            raw_dir = "#{src_dir}/raw"
-            dest_dir = "#{raw_dir}/#{timestamp}"
 
-            system(<<-EOS
-              mkdir -p "#{dest_dir}"
-              cd "#{src_dir}" || exit 1
+ruby_block 'copy_alerts_with_full_date_hour_shell' do
+  block do
+    timestamp = Time.now.strftime('%Y-%m-%d_%H')
+    src_dir = '/etc/snort/0_default_0'
+    raw_dir = "#{src_dir}/raw"
+    dest_dir = "#{raw_dir}/#{timestamp}"
 
-              for file in *_alert_full.txt; do
-                [ -e "$file" ] || continue
+    # Entire shell logic
+    system(<<-EOS
+      mkdir -p "#{dest_dir}"
+      cd "#{src_dir}" || exit 1
 
-                base_name="$(basename "$file")"
-                name="${base_name%.*}"
-                ext="${base_name##*.}"
+      for file in *_alert_full.txt; do
+        [ -e "$file" ] || continue  # skip if no matching files
 
-                dest_file="#{dest_dir}/$base_name"
+        base_name="$(basename "$file")"
+        name="${base_name%.*}"
+        ext="${base_name##*.}"
 
-                if [ -e "$dest_file" ]; then
-                  i=1
-                  while [ -e "#{dest_dir}/$name_$i.$ext" ]; do
-                    i=$((i + 1))
-                  done
-                  dest_file="#{dest_dir}/$name_$i.$ext"
-                fi
+        dest_file="#{dest_dir}/$base_name"
 
-                cp -f "$file" "$dest_file"
-                : > "$file"
-                echo "Copied $file to $dest_file and truncated original"
-              done
+        # Find unique name if conflict exists
+        if [ -e "$dest_file" ]; then
+          i=1
+          while [ -e "#{dest_dir}/$name_$i.$ext" ]; do
+            i=$((i + 1))
+          done
+          dest_file="#{dest_dir}/$name_$i.$ext"
+        fi
 
-              find "#{dest_dir}" -type f -size 0 -name '*.txt' -delete
-            EOS
-                  )
-          end
-          action :run
-        end
+        cp -f "$file" "$dest_file"
+        : > "$file"  # Truncate original file
+        echo "Copied $file to $dest_file and truncated original"
+      done
+
+      # Remove empty files from destination folder
+      find "#{dest_dir}" -type f -size 0 -name '*.txt' -delete
+    EOS
+    )
+  end
+  action :run
+end
 
         begin
           sensor_id = node['redborder']['sensor_id'].to_i
@@ -166,7 +183,7 @@ action :add do
         end
 
         iface = `ip link show master #{group['segments'].join(' ')} | grep '^[0-9]' | awk '{print $2}' | cut -d':' -f1 | paste -sd ":"`.chomp!
-        threads = group['cpu_list'].size * 2
+        threads = group['cpu_list'].size
         cpu_cores = group['cpu_list'].join(' ')
         mode = group['mode']
         inline = (mode != 'IDS' && mode != 'IDS_SPAN') && (mode == 'IPS' || mode == 'IDS_FWD' || mode == 'IPS_TEST')
@@ -199,6 +216,43 @@ action :add do
           variables(iface: iface, cpu_cores: cpu_cores, threads: threads, mode: mode, inline: inline, args: args, output_plugin: output_plugin)
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
+        end
+
+        template "/etc/snort/#{instance_name}/snort.rules" do
+          source 'empty.erb'
+          cookbook 'snort3'
+          owner 'root'
+          group 'root'
+          mode '0644'
+          retries 2
+          not_if { ::File.exist?("/etc/snort/#{instance_name}/snort.rules") && !::File.zero?("/etc/snort/#{instance_name}/snort.rules") }
+        end
+
+        template_paths = {
+          "iplists/allowlist"    => "/etc/snort/#{instance_name}/iplists",
+          "iplists/blacklist"    => "/etc/snort/#{instance_name}/iplists",
+          "iplists/monitorlist"  => "/etc/snort/#{instance_name}/iplists",
+          "geoips/rbgeoip"       => "/etc/snort/#{instance_name}/geoips"
+        }
+
+        template_paths.each do |relative_path, dir_path|
+          directory dir_path do
+            recursive true
+            owner 'root'
+            group 'root'
+            mode '0755'
+            action :create
+          end
+
+          template "/etc/snort/#{instance_name}/#{relative_path}" do
+            source 'empty.erb'
+            cookbook 'snort3'
+            owner 'root'
+            group 'root'
+            mode '0644'
+            retries 2
+            not_if { ::File.exist?("/etc/snort/#{instance_name}/#{relative_path}") }
+          end
         end
 
         template "/etc/snort/#{instance_name}/snort-variables.conf" do
