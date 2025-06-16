@@ -45,57 +45,56 @@ action :add do
     groups.each do |group|
       group_name = group['name']
 
-  puts "Processing group: #{group['name']}"
-  default_added = false
-  # Iterate over binding keys (as strings), sorted by integer value
-  group['bindings']
-       .keys
-       .map(&:to_i)
-       .sort
-       .map(&:to_s)
-       .each do |id_str|
+      puts "Processing group: #{group['name']}"
+      default_added = false
+      # Iterate over binding keys (as strings), sorted by integer value
+      group['bindings']
+        .keys
+        .map(&:to_i)
+        .sort
+        .map(&:to_s)
+        .each do |id_str|
+        vgroup         = group['bindings'][id_str].to_hash.clone
+        vgroup_name    = vgroup['name'].nil? ? 'default' : vgroup['name'].to_s
+        vgroup['name'] = vgroup_name
+        binding_id     = id_str.to_i
+        vgroup['id']   = binding_id
 
-    vgroup         = group['bindings'][id_str].to_hash.clone
-    vgroup_name    = vgroup['name'].nil? ? 'default' : vgroup['name'].to_s
-    vgroup['name'] = vgroup_name
-    binding_id     = id_str.to_i
-    vgroup['id']   = binding_id
+        # Check if both vlan_objects and network_objects are empty or nil
+        has_vlans   = vgroup['vlan_objects'] && !vgroup['vlan_objects'].empty?
+        has_network = vgroup['network_objects'] && !vgroup['network_objects'].empty?
 
-    # Check if both vlan_objects and network_objects are empty or nil
-    has_vlans   = vgroup['vlan_objects'] && !vgroup['vlan_objects'].empty?
-    has_network = vgroup['network_objects'] && !vgroup['network_objects'].empty?
+        if !has_vlans && !has_network
+          if default_added
+            puts "Skipping additional empty binding #{binding_id} (already added default)"
+            next
+          else
+            puts "Adding default binding for #{binding_id}"
+            default_added = true
+          end
+        else
+          puts "Adding binding #{binding_id} with vlan/network objects"
+        end
 
-    if !has_vlans && !has_network
-      if default_added
-        puts "Skipping additional empty binding #{binding_id} (already added default)"
-        next
-      else
-        puts "Adding default binding for #{binding_id}"
-        default_added = true
-      end
-    else
-      puts "Adding binding #{binding_id} with vlan/network objects"
-    end
+        # Only assign defaults if ipvars or portvars are missing/empty
+        if vgroup['ipvars'].nil? || vgroup['ipvars'].empty?
+          vgroup['ipvars'] = node['redborder']['snort']['default']['ipvars']
+          puts "Set default ipvars for binding #{binding_id}"
+        end
 
-    # Only assign defaults if ipvars or portvars are missing/empty
-    if vgroup['ipvars'].nil? || vgroup['ipvars'].empty?
-      vgroup['ipvars'] = node['redborder']['snort']['default']['ipvars']
-      puts "Set default ipvars for binding #{binding_id}"
-    end
+        if vgroup['portvars'].nil? || vgroup['portvars'].empty?
+          vgroup['portvars'] = node['redborder']['snort']['default']['portvars']
+          puts "Set default portvars for binding #{binding_id}"
+        end
 
-    if vgroup['portvars'].nil? || vgroup['portvars'].empty?
-      vgroup['portvars'] = node['redborder']['snort']['default']['portvars']
-      puts "Set default portvars for binding #{binding_id}"
-    end
+        # Build the instance name and enable the service
+        instance_name = "#{group['instances_group']}_#{group['name']}_#{binding_id}"
+        valid_instance_names << "snort3@#{instance_name}.service"
+        puts "Enabling service: snort3@#{instance_name}.service"
 
-    # Build the instance name and enable the service
-    instance_name = "#{group['instances_group']}_#{group['name']}_#{binding_id}"
-    valid_instance_names << "snort3@#{instance_name}.service"
-    puts "Enabling service: snort3@#{instance_name}.service"
-
-    service "snort3@#{instance_name}.service" do
-      action [:enable]
-    end
+        service "snort3@#{instance_name}.service" do
+          action [:enable]
+        end
         %w(reload restart stop start).each do |s_action|
           execute "#{s_action}_snort3@#{instance_name}" do
             command "/bin/env WAIT=1 /bin/systemctl #{s_action} snort3@#{instance_name}.service"
@@ -120,16 +119,15 @@ action :add do
           action :create
         end
 
+        ruby_block 'copy_alerts_with_full_date_hour_shell' do
+          block do
+            timestamp = Time.now.strftime('%Y-%m-%d_%H')
+            src_dir = '/etc/snort/0_default_0'
+            raw_dir = "#{src_dir}/raw"
+            dest_dir = "#{raw_dir}/#{timestamp}"
 
-ruby_block 'copy_alerts_with_full_date_hour_shell' do
-  block do
-    timestamp = Time.now.strftime('%Y-%m-%d_%H')
-    src_dir = '/etc/snort/0_default_0'
-    raw_dir = "#{src_dir}/raw"
-    dest_dir = "#{raw_dir}/#{timestamp}"
-
-    # Entire shell logic
-    system(<<-EOS
+            # Entire shell logic
+            system(<<-EOS
       mkdir -p "#{dest_dir}"
       cd "#{src_dir}" || exit 1
 
@@ -159,10 +157,10 @@ ruby_block 'copy_alerts_with_full_date_hour_shell' do
       # Remove empty files from destination folder
       find "#{dest_dir}" -type f -size 0 -name '*.txt' -delete
     EOS
-    )
-  end
-  action :run
-end
+                  )
+          end
+          action :run
+        end
 
         begin
           sensor_id = node['redborder']['sensor_id'].to_i
@@ -229,10 +227,10 @@ end
         end
 
         template_paths = {
-          "iplists/allowlist"    => "/etc/snort/#{instance_name}/iplists",
-          "iplists/blacklist"    => "/etc/snort/#{instance_name}/iplists",
-          "iplists/monitorlist"  => "/etc/snort/#{instance_name}/iplists",
-          "geoips/rbgeoip"       => "/etc/snort/#{instance_name}/geoips"
+          'iplists/allowlist'    => "/etc/snort/#{instance_name}/iplists",
+          'iplists/blacklist'    => "/etc/snort/#{instance_name}/iplists",
+          'iplists/monitorlist'  => "/etc/snort/#{instance_name}/iplists",
+          'geoips/rbgeoip'       => "/etc/snort/#{instance_name}/geoips",
         }
 
         template_paths.each do |relative_path, dir_path|
@@ -251,7 +249,7 @@ end
             group 'root'
             mode '0644'
             retries 2
-            not_if { ::File.exist?("/etc/snort/#{instance_name}/#{relative_path}") }
+            action :create_if_missing
           end
         end
 
