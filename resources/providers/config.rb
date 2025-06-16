@@ -44,10 +44,7 @@ action :add do
 
     groups.each do |group|
       group_name = group['name']
-
-      puts "Processing group: #{group['name']}"
       default_added = false
-      # Iterate over binding keys (as strings), sorted by integer value
       group['bindings']
         .keys
         .map(&:to_i)
@@ -60,37 +57,27 @@ action :add do
         binding_id     = id_str.to_i
         vgroup['id']   = binding_id
 
-        # Check if both vlan_objects and network_objects are empty or nil
         has_vlans   = vgroup['vlan_objects'] && !vgroup['vlan_objects'].empty?
         has_network = vgroup['network_objects'] && !vgroup['network_objects'].empty?
 
         if !has_vlans && !has_network
           if default_added
-            puts "Skipping additional empty binding #{binding_id} (already added default)"
             next
           else
-            puts "Adding default binding for #{binding_id}"
             default_added = true
           end
-        else
-          puts "Adding binding #{binding_id} with vlan/network objects"
         end
 
-        # Only assign defaults if ipvars or portvars are missing/empty
         if vgroup['ipvars'].nil? || vgroup['ipvars'].empty?
           vgroup['ipvars'] = node['redborder']['snort']['default']['ipvars']
-          puts "Set default ipvars for binding #{binding_id}"
         end
 
         if vgroup['portvars'].nil? || vgroup['portvars'].empty?
           vgroup['portvars'] = node['redborder']['snort']['default']['portvars']
-          puts "Set default portvars for binding #{binding_id}"
         end
 
-        # Build the instance name and enable the service
         instance_name = "#{group['instances_group']}_#{group['name']}_#{binding_id}"
         valid_instance_names << "snort3@#{instance_name}.service"
-        puts "Enabling service: snort3@#{instance_name}.service"
 
         service "snort3@#{instance_name}.service" do
           action [:enable]
@@ -126,37 +113,34 @@ action :add do
             raw_dir = "#{src_dir}/raw"
             dest_dir = "#{raw_dir}/#{timestamp}"
 
-            # Entire shell logic
             system(<<-EOS
-      mkdir -p "#{dest_dir}"
-      cd "#{src_dir}" || exit 1
+              mkdir -p "#{dest_dir}"
+              cd "#{src_dir}" || exit 1
 
-      for file in *_alert_full.txt; do
-        [ -e "$file" ] || continue  # skip if no matching files
+              for file in *_alert_full.txt; do
+                [ -e "$file" ] || continue
 
-        base_name="$(basename "$file")"
-        name="${base_name%.*}"
-        ext="${base_name##*.}"
+                base_name="$(basename "$file")"
+                name="${base_name%.*}"
+                ext="${base_name##*.}"
 
-        dest_file="#{dest_dir}/$base_name"
+                dest_file="#{dest_dir}/$base_name"
 
-        # Find unique name if conflict exists
-        if [ -e "$dest_file" ]; then
-          i=1
-          while [ -e "#{dest_dir}/$name_$i.$ext" ]; do
-            i=$((i + 1))
-          done
-          dest_file="#{dest_dir}/$name_$i.$ext"
-        fi
+                if [ -e "$dest_file" ]; then
+                  i=1
+                  while [ -e "#{dest_dir}/$name_$i.$ext" ]; do
+                    i=$((i + 1))
+                  done
+                  dest_file="#{dest_dir}/$name_$i.$ext"
+                fi
 
-        cp -f "$file" "$dest_file"
-        : > "$file"  # Truncate original file
-        echo "Copied $file to $dest_file and truncated original"
-      done
+                cp -f "$file" "$dest_file"
+                : > "$file"
+                echo "Copied $file to $dest_file and truncated original"
+              done
 
-      # Remove empty files from destination folder
-      find "#{dest_dir}" -type f -size 0 -name '*.txt' -delete
-    EOS
+              find "#{dest_dir}" -type f -size 0 -name '*.txt' -delete
+            EOS
                   )
           end
           action :run
