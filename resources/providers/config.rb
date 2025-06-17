@@ -107,18 +107,18 @@ action :add do
         cpu_cores = group['cpu_list'].join(' ')
         mode = group['mode']
         inline = (mode != 'IDS' && mode != 'IDS_SPAN') && (mode == 'IPS' || mode == 'IDS_FWD' || mode == 'IPS_TEST')
-        
+
         # This should be redborder_afpacket_sbypass_profile
-        case group["pfring_sbypass_profile"]
-        when "1" # connectivity
+        case group['pfring_sbypass_profile']
+        when '1' # connectivity
           sbypass_upper = 60
           sbypass_lower = 10
           sbypass_rate  = 5000
-        when "2" # balanced
+        when '2' # balanced
           sbypass_upper = 75
           sbypass_lower = 25
           sbypass_rate  = 2000
-        when "3" # security
+        when '3' # security
           sbypass_upper = 90
           sbypass_lower = 40
           sbypass_rate  = 2000
@@ -132,19 +132,19 @@ action :add do
         malware_file_capture = false
         args = if inline
                  args = "--daq redborder_afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}"
-                 args += " -k none -s 65535" if malware_file_capture
+                 args += ' -k none -s 65535' if malware_file_capture
                  args += " --daq-var sbypassupperthreshold=#{sbypass_upper}"
                  args += " --daq-var sbypasslowerthreshold=#{sbypass_lower}"
                  args += " --daq-var sbypasssamplingrate=#{sbypass_rate}"
-                 args += " --treat-drop-as-alert" if mode == 'IDS_FWD' || mode == 'IDS'
+                 args += ' --treat-drop-as-alert' if mode == 'IDS_FWD' || mode == 'IDS'
                  args
                else
                  args = "--daq redborder_afpacket --daq-var fanout_type=hash -i #{iface}"
-                 args += " -k none -s 65535" if malware_file_capture
-                 args += " --daq-var sbypassupperthreshold=0"
-                 args += " --daq-var sbypasslowerthreshold=0"
-                 args += " --daq-var sbypasssamplingrate=0"
-                 args += " --treat-drop-as-alert" if mode == 'IDS_SPAN' || mode
+                 args += ' -k none -s 65535' if malware_file_capture
+                 args += ' --daq-var sbypassupperthreshold=0'
+                 args += ' --daq-var sbypasslowerthreshold=0'
+                 args += ' --daq-var sbypasssamplingrate=0'
+                 args += ' --treat-drop-as-alert' if mode == 'IDS_SPAN' || mode
                  args
                end
 
@@ -157,7 +157,7 @@ action :add do
                           'alert_kafka'
                         end
 
-        autobypass = group["autobypass"] ? 1 : 0
+        autobypass = group['autobypass'] ? 1 : 0
 
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
