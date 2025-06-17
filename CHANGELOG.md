@@ -1,6 +1,11 @@
 cookbook-snort3 CHANGELOG
 ===============
 
+## 0.1.1
+
+  - Miguel Alvarez
+    - [262b1b8] IPvars per group and not global in intrusion
+
 ## 0.1.0
 
   - Miguel Alvarez
