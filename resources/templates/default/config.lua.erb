@@ -71,14 +71,16 @@ ftp_data = { }
 http_inspect = { }
 http2_inspect = { }
 
+<% if File.exist?('/usr/share/GeoIP/GeoLite2-Country.mmdb') %>
 reputation = {
   allow = 'trust',
   geoip_db_path = '/usr/share/GeoIP/GeoLite2-Country.mmdb',
-  geoip_manifest_path = '/etc/snort/<%=@instance_name%>/geoips/rbgeoip',
-  allowlist = '/etc/snort/<%=@instance_name%>/iplists/allowlist',
-  blocklist = '/etc/snort/<%=@instance_name%>/iplists/blacklist',
-  monitorlist = '/etc/snort/<%=@instance_name%>/iplists/monitorlist'
+  geoip_manifest_path = '/etc/snort/<%= @instance_name %>/geoips/rbgeoip',
+  allowlist = '/etc/snort/<%= @instance_name %>/iplists/allowlist',
+  blocklist = '/etc/snort/<%= @instance_name %>/iplists/blacklist',
+  monitorlist = '/etc/snort/<%= @instance_name %>/iplists/monitorlist'
 }
+<% end %>
 
 ---------------------------------------------------------------------------
 -- 3. configure bindings
@@ -271,6 +273,7 @@ rate_filter =
 
 alert_http = {
     http_endpoint =  "https://http2k.<%= node["redborder"]["cdomain"] %>/rbdata/<%= node["redborder"]["sensor_uuid"] %>/rb_event",
+    mac_vendors =   "/etc/macvendors/mac_vendors",
     verify_ssl =     false,
     enrichment =    '<%= enrichment_json %>',
     fields = 'src dst priority src_country_code dst_country_code sig_id ethlength_range sig_generator action msg class src_port dst_port eth_dst_mac eth_src_mac eth_dst eth_src vlan iplen udplen'
@@ -285,6 +288,7 @@ alert_http = {
 alert_kafka = {
     file = true,
     topic =         "rb_event",
+    mac_vendors =   "/etc/macvendors/mac_vendors",
     broker_host =   "kafka.<%= node["redborder"]["cdomain"] %>:9092",
     enrichment =    '<%= enrichment_json %>',
     fields = 'src dst priority src_country_code dst_country_code sig_id ethlength_range sig_generator action msg class src_port dst_port eth_dst_mac eth_src_mac eth_dst eth_src vlan iplen udplen'
