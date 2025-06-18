@@ -102,6 +102,7 @@ action :add do
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
 
+        segment = group['segments'].join(' ')
         iface = `ip link show master #{group['segments'].join(' ')} | grep '^[0-9]' | awk '{print $2}' | cut -d':' -f1 | paste -sd ":"`.chomp!
         threads = group['cpu_list'].size * 2
         cpu_cores = group['cpu_list'].join(' ')
