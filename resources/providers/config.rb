@@ -161,6 +161,16 @@ action :add do
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
 
+        template "/etc/snort/#{instance_name}/snort.rules" do
+          source 'empty.erb'
+          cookbook 'snort3'
+          owner 'root'
+          group 'root'
+          mode '0644'
+          retries 2
+          not_if { ::File.exist?("/etc/snort/#{instance_name}/snort.rules") && !::File.zero?("/etc/snort/#{instance_name}/snort.rules") }
+        end
+
         template "/etc/snort/#{instance_name}/snort-variables.conf" do
           source 'snort-variables.conf.erb'
           cookbook 'snort3'
