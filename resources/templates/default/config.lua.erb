@@ -274,6 +274,7 @@ alert_http = {
 ---------------------------------------------------------------------------
 
 alert_kafka = {
+    file = true,
     topic =         "rb_event",
     broker_host =   "kafka.<%= node["redborder"]["cdomain"] %>:9092",
     enrichment =    '<%= enrichment_json %>',
