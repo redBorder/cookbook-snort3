@@ -273,7 +273,7 @@ alert_http = {
 --- kafka output plugin
 ---------------------------------------------------------------------------
 
-alert_kafka = 
+alert_kafka = {
     file = true,
     topic =         "rb_event",
     broker_host =   "kafka.<%= node["redborder"]["cdomain"] %>:9092",
