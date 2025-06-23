@@ -1,6 +1,12 @@
 cookbook-snort3 CHANGELOG
 ===============
 
+## 0.1.3
+
+  - Miguel Alvarez
+    - [5c0c817] Add raw view for intrusion sensor (#5)
+    - [0b17e04] Create snort.rules file for intrusion (#3)
+
 ## 0.1.2
 
   - Miguel Alvarez
