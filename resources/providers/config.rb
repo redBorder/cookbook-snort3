@@ -6,21 +6,6 @@ action :add do
     sensor_id = new_resource.sensor_id
     groups = new_resource.groups
 
-    # temporary until we configure selinux
-    ruby_block 'set_enforce_0' do
-      block do
-        selinux_status = `getenforce`
-
-        if selinux_status.strip != 'Permissive'
-          Chef::Log.warn('Setting SELinux to permissive mode...')
-          system('setenforce 0')
-        else
-          Chef::Log.info('SELinux is already in permissive mode.')
-        end
-      end
-      action :run
-    end
-
     ruby_block 'check_bpctl_mod' do
       block do
         module_loaded = `lsmod | grep bpctl_mod`
