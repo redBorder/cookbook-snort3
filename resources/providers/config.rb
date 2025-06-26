@@ -82,7 +82,6 @@ action :add do
         service "snort3@#{instance_name}.service" do
           action [:enable]
         end
-
         %w(reload restart stop start).each do |s_action|
           execute "#{s_action}_snort3@#{instance_name}" do
             command "/bin/env WAIT=1 /bin/systemctl #{s_action} snort3@#{instance_name}.service"
@@ -147,6 +146,46 @@ action :add do
           action :run
         end
 
+        ruby_block 'copy_alerts_with_full_date_hour_shell' do
+          block do
+            timestamp = Time.now.strftime('%Y-%m-%d_%H')
+            src_dir = '/etc/snort/0_default_0'
+            raw_dir = "#{src_dir}/raw"
+            dest_dir = "#{raw_dir}/#{timestamp}"
+
+            system(<<-EOS
+              mkdir -p "#{dest_dir}"
+              cd "#{src_dir}" || exit 1
+
+              for file in *_alert_full.txt; do
+                [ -e "$file" ] || continue
+
+                base_name="$(basename "$file")"
+                name="${base_name%.*}"
+                ext="${base_name##*.}"
+
+                dest_file="#{dest_dir}/$base_name"
+
+                if [ -e "$dest_file" ]; then
+                  i=1
+                  while [ -e "#{dest_dir}/$name_$i.$ext" ]; do
+                    i=$((i + 1))
+                  done
+                  dest_file="#{dest_dir}/$name_$i.$ext"
+                fi
+
+                cp -f "$file" "$dest_file"
+                : > "$file"
+                echo "Copied $file to $dest_file and truncated original"
+              done
+
+              find "#{dest_dir}" -type f -size 0 -name '*.txt' -delete
+            EOS
+                  )
+          end
+          action :run
+        end
+
         begin
           sensor_id = node['redborder']['sensor_id'].to_i
         rescue
@@ -166,7 +205,7 @@ action :add do
         end
 
         iface = `ip link show master #{group['segments'].join(' ')} | grep '^[0-9]' | awk '{print $2}' | cut -d':' -f1 | paste -sd ":"`.chomp!
-        threads = group['cpu_list'].size * 2
+        threads = group['cpu_list'].size
         cpu_cores = group['cpu_list'].join(' ')
         mode = group['mode']
         inline = (mode != 'IDS' && mode != 'IDS_SPAN') && (mode == 'IPS' || mode == 'IDS_FWD' || mode == 'IPS_TEST')
@@ -209,6 +248,33 @@ action :add do
           mode '0644'
           retries 2
           not_if { ::File.exist?("/etc/snort/#{instance_name}/snort.rules") && !::File.zero?("/etc/snort/#{instance_name}/snort.rules") }
+        end
+
+        template_paths = {
+          'iplists/allowlist'    => "/etc/snort/#{instance_name}/iplists",
+          'iplists/blacklist'    => "/etc/snort/#{instance_name}/iplists",
+          'iplists/monitorlist'  => "/etc/snort/#{instance_name}/iplists",
+          'geoips/rbgeoip'       => "/etc/snort/#{instance_name}/geoips",
+        }
+
+        template_paths.each do |relative_path, dir_path|
+          directory dir_path do
+            recursive true
+            owner 'root'
+            group 'root'
+            mode '0755'
+            action :create
+          end
+
+          template "/etc/snort/#{instance_name}/#{relative_path}" do
+            source 'empty.erb'
+            cookbook 'snort3'
+            owner 'root'
+            group 'root'
+            mode '0644'
+            retries 2
+            action :create_if_missing
+          end
         end
 
         template "/etc/snort/#{instance_name}/snort-variables.conf" do
