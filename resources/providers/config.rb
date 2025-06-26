@@ -146,6 +146,7 @@ action :add do
           action :run
         end
 
+<<<<<<< feature/intrusion_reputation
         ruby_block 'copy_alerts_with_full_date_hour_shell' do
           block do
             timestamp = Time.now.strftime('%Y-%m-%d_%H')
@@ -186,6 +187,8 @@ action :add do
           action :run
         end
 
+=======
+>>>>>>> development
         begin
           sensor_id = node['redborder']['sensor_id'].to_i
         rescue
