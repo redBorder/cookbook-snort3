@@ -82,7 +82,6 @@ action :add do
         service "snort3@#{instance_name}.service" do
           action [:enable]
         end
-
         %w(reload restart stop start).each do |s_action|
           execute "#{s_action}_snort3@#{instance_name}" do
             command "/bin/env WAIT=1 /bin/systemctl #{s_action} snort3@#{instance_name}.service"
@@ -166,7 +165,7 @@ action :add do
         end
 
         iface = `ip link show master #{group['segments'].join(' ')} | grep '^[0-9]' | awk '{print $2}' | cut -d':' -f1 | paste -sd ":"`.chomp!
-        threads = group['cpu_list'].size * 2
+        threads = group['cpu_list'].size
         cpu_cores = group['cpu_list'].join(' ')
         mode = group['mode']
         inline = (mode != 'IDS' && mode != 'IDS_SPAN') && (mode == 'IPS' || mode == 'IDS_FWD' || mode == 'IPS_TEST')
@@ -219,6 +218,34 @@ action :add do
           mode '0644'
           retries 2
           not_if { ::File.exist?("/etc/snort/#{instance_name}/events.lua") && !::File.zero?("/etc/snort/#{instance_name}/events.lua") }
+        end
+
+        template_paths = {
+          'iplists/allowlist'    => "/etc/snort/#{instance_name}/iplists",
+          'iplists/blacklist'    => "/etc/snort/#{instance_name}/iplists",
+          'iplists/monitorlist'  => "/etc/snort/#{instance_name}/iplists",
+          'geoips/rbgeoip'       => "/etc/snort/#{instance_name}/geoips",
+        }
+
+        template_paths.each do |relative_path, dir_path|
+          directory dir_path do
+            recursive true
+            owner 'root'
+            group 'root'
+            mode '0755'
+            action :create
+          end
+
+          template "/etc/snort/#{instance_name}/#{relative_path}" do
+            source 'empty.erb'
+            cookbook 'snort3'
+            owner 'root'
+            group 'root'
+            mode '0644'
+            retries 2
+            action :create_if_missing
+          end
+>>>>>>> master
         end
 
         template "/etc/snort/#{instance_name}/snort-variables.conf" do

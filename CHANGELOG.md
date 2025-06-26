@@ -1,5 +1,10 @@
 cookbook-snort3 CHANGELOG
-===============
+
+## 0.1.4
+
+  - Miguel Alvarez
+    - [a434c47] Intrusion snort3 reputation (#6)
+    - [0b17e04] Create snort.rules file for intrusion (#3)
 
 ## 0.1.3
 
