@@ -245,7 +245,6 @@ action :add do
             retries 2
             action :create_if_missing
           end
->>>>>>> master
         end
 
         template "/etc/snort/#{instance_name}/snort-variables.conf" do
