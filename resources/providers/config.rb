@@ -37,7 +37,6 @@ action :add do
 
     dnf_package 'snort3' do
       action :upgrade
-      flush_cache [:before]
     end
 
     valid_instance_names = []
