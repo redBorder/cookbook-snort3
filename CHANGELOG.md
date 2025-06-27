@@ -1,6 +1,11 @@
 cookbook-snort3 CHANGELOG
 ===============
 
+## 0.1.5
+
+  - nilsver
+    - [d3c7d69] remove flush cache
+
 ## 0.1.4
 
   - Miguel Alvarez
