@@ -37,7 +37,6 @@ action :add do
 
     dnf_package 'snort3' do
       action :upgrade
-      flush_cache [:before]
     end
 
     valid_instance_names = []
@@ -104,6 +103,46 @@ action :add do
           mode '0755'
           recursive true
           action :create
+        end
+
+        ruby_block 'copy_alerts_with_full_date_hour_shell' do
+          block do
+            timestamp = Time.now.strftime('%Y-%m-%d_%H')
+            src_dir = '/etc/snort/0_default_0'
+            raw_dir = "#{src_dir}/raw"
+            dest_dir = "#{raw_dir}/#{timestamp}"
+
+            system(<<-EOS
+              mkdir -p "#{dest_dir}"
+              cd "#{src_dir}" || exit 1
+
+              for file in *_alert_full.txt; do
+                [ -e "$file" ] || continue
+
+                base_name="$(basename "$file")"
+                name="${base_name%.*}"
+                ext="${base_name##*.}"
+
+                dest_file="#{dest_dir}/$base_name"
+
+                if [ -e "$dest_file" ]; then
+                  i=1
+                  while [ -e "#{dest_dir}/$name_$i.$ext" ]; do
+                    i=$((i + 1))
+                  done
+                  dest_file="#{dest_dir}/$name_$i.$ext"
+                fi
+
+                cp -f "$file" "$dest_file"
+                : > "$file"
+                echo "Copied $file to $dest_file and truncated original"
+              done
+
+              find "#{dest_dir}" -type f -size 0 -name '*.txt' -delete
+            EOS
+                  )
+          end
+          action :run
         end
 
         ruby_block 'copy_alerts_with_full_date_hour_shell' do
