@@ -1,6 +1,11 @@
 cookbook-snort3 CHANGELOG
 ===============
 
+## 0.1.6
+
+  - Miguel Alvarez
+    - [280c06a] Add intrusion thresholds (#11)
+
 ## 0.1.5
 
   - nilsver
