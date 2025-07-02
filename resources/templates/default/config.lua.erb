@@ -238,6 +238,9 @@ alert_http = {
     http_endpoint =  "https://http2k.<%= node["redborder"]["cdomain"] %>/rbdata/<%= node["redborder"]["sensor_uuid"] %>/rb_event",
     mac_vendors =   "/etc/macvendors/mac_vendors",
     verify_ssl =     false,
+    mode =                "bulk",
+    bulk_queue_size =      500,
+    max_queue_flush_time = 60000,
     enrichment =    '<%= enrichment_json %>',
     fields = 'src dst priority src_country_code dst_country_code sig_id ethlength_range sig_generator action msg class src_port dst_port eth_dst_mac eth_src_mac eth_dst eth_src vlan iplen udplen'
 }
