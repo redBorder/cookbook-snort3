@@ -71,6 +71,17 @@ ftp_data = { }
 http_inspect = { }
 http2_inspect = { }
 
+<% if File.exist?('/usr/share/GeoIP/GeoLite2-Country.mmdb') %>
+reputation = {
+  allow = 'trust',
+  geoip_db_path = '/usr/share/GeoIP/GeoLite2-Country.mmdb',
+  geoip_manifest_path = '/etc/snort/<%= @instance_name %>/geoips/rbgeoip',
+  allowlist = '/etc/snort/<%= @instance_name %>/iplists/allowlist',
+  blocklist = '/etc/snort/<%= @instance_name %>/iplists/blacklist',
+  monitorlist = '/etc/snort/<%= @instance_name %>/iplists/monitorlist'
+}
+<% end %>
+
 ---------------------------------------------------------------------------
 -- 3. configure bindings
 ---------------------------------------------------------------------------
@@ -180,47 +191,10 @@ ips =
 -- payload_injector = { }
 
 ---------------------------------------------------------------------------
--- 6. configure filters
+-- 6. configure filters (custom redBorder modifications)
 ---------------------------------------------------------------------------
 
--- below are examples of filters
--- each table is a list of records
-
---[[
-suppress =
-{
-    -- don't want to any of see these
-    { gid = 1, sid = 1 },
-
-    -- don't want to see anything for a given host
-    { track = 'by_dst', ip = '1.2.3.4' }
-
-    -- don't want to see these for a given host
-    { gid = 1, sid = 2, track = 'by_dst', ip = '1.2.3.4' },
-}
---]]
-
---[[
-event_filter =
-{
-    -- reduce the number of events logged for some rules
-    { gid = 1, sid = 1, type = 'limit', track = 'by_src', count = 2, seconds = 10 },
-    { gid = 1, sid = 2, type = 'both',  track = 'by_dst', count = 5, seconds = 60 },
-}
---]]
-
---[[
-rate_filter =
-{
-    -- alert on connection attempts from clients in SOME_NET
-    { gid = 135, sid = 1, track = 'by_src', count = 5, seconds = 1,
-      new_action = 'alert', timeout = 4, apply_to = '[$SOME_NET]' },
-
-    -- alert on connections to servers over threshold
-    { gid = 135, sid = 2, track = 'by_dst', count = 29, seconds = 3,
-      new_action = 'alert', timeout = 1 },
-}
---]]
+include('/etc/snort/<%=@instance_name%>/events.lua')
 
 ---------------------------------------------------------------------------
 -- 7. configure outputs
@@ -244,7 +218,7 @@ rate_filter =
   enrichment_json += "\"sensor_uuid\":\"#{node['redborder']['sensor_uuid']}\","
   enrichment_json += "\"sensor_name\":\"#{node['rbname']}\","
   enrichment_json += "\"group_uuid\":\"#{@group['group_uuid'].nil? ? '0' : @group['group_uuid']}\","
-  enrichment_json += "\"group_name\":\"#{@name.nil? ? 'default' : @name}\","
+  enrichment_json += "\"group_name\":\"#{@group_name.nil? ? 'default' : @group_name}\","
   enrichment_json += "\"sensor_type\":\"ips\","
   enrichment_json += "\"domain_name\":\"#{@group['domain_name'].nil? ? '0' : @group['domain_name']}\","
   enrichment_json += "\"sensor_ip\":\"#{node['ipaddress']}\""
@@ -262,6 +236,7 @@ rate_filter =
 
 alert_http = {
     http_endpoint =  "https://http2k.<%= node["redborder"]["cdomain"] %>/rbdata/<%= node["redborder"]["sensor_uuid"] %>/rb_event",
+    mac_vendors =   "/etc/macvendors/mac_vendors",
     verify_ssl =     false,
     enrichment =    '<%= enrichment_json %>',
     fields = 'src dst priority src_country_code dst_country_code sig_id ethlength_range sig_generator action msg class src_port dst_port eth_dst_mac eth_src_mac eth_dst eth_src vlan iplen udplen'
@@ -274,7 +249,9 @@ alert_http = {
 ---------------------------------------------------------------------------
 
 alert_kafka = {
+    file = true,
     topic =         "rb_event",
+    mac_vendors =   "/etc/macvendors/mac_vendors",
     broker_host =   "kafka.<%= node["redborder"]["cdomain"] %>:9092",
     enrichment =    '<%= enrichment_json %>',
     fields = 'src dst priority src_country_code dst_country_code sig_id ethlength_range sig_generator action msg class src_port dst_port eth_dst_mac eth_src_mac eth_dst eth_src vlan iplen udplen'
@@ -288,5 +265,3 @@ alert_kafka = {
 if ( tweaks ~= nil ) then
     include(tweaks .. '.lua')
 end
-
-
