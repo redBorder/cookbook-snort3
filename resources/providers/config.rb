@@ -188,18 +188,50 @@ action :add do
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
 
+        segment = group['segments'].join(' ')
         iface = `ip link show master #{group['segments'].join(' ')} | grep '^[0-9]' | awk '{print $2}' | cut -d':' -f1 | paste -sd ":"`.chomp!
         threads = group['cpu_list'].size
         cpu_cores = group['cpu_list'].join(' ')
         mode = group['mode']
         inline = (mode != 'IDS' && mode != 'IDS_SPAN') && (mode == 'IPS' || mode == 'IDS_FWD' || mode == 'IPS_TEST')
+
+        # This should be redborder_afpacket_sbypass_profile
+        case group['pfring_sbypass_profile']
+        when '1' # connectivity
+          sbypass_upper = 60
+          sbypass_lower = 10
+          sbypass_rate  = 5000
+        when '2' # balanced
+          sbypass_upper = 75
+          sbypass_lower = 25
+          sbypass_rate  = 2000
+        when '3' # security
+          sbypass_upper = 90
+          sbypass_lower = 40
+          sbypass_rate  = 2000
+        else
+          sbypass_upper = 0
+          sbypass_lower = 0
+          sbypass_rate  = 0
+        end
+
+        # This will be for malware
+        malware_file_capture = false
         args = if inline
-                 args = "--daq afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}" # IPS_TEST
-                 args = "#{args} --treat-drop-as-alert" if mode == 'IDS_FWD' || mode == 'IDS'
+                 args = "--daq redborder_afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}"
+                 args += ' -k none -s 65535' if malware_file_capture
+                 args += " --daq-var sbypassupperthreshold=#{sbypass_upper}"
+                 args += " --daq-var sbypasslowerthreshold=#{sbypass_lower}"
+                 args += " --daq-var sbypasssamplingrate=#{sbypass_rate}"
+                 args += ' --treat-drop-as-alert' if mode == 'IDS_FWD' || mode == 'IDS'
                  args
                else
-                 args = "--daq afpacket --daq-var fanout_type=hash -i #{iface}"
-                 args = "#{args} --treat-drop-as-alert" if mode == 'IDS_SPAN' || mode
+                 args = "--daq redborder_afpacket --daq-var fanout_type=hash -i #{iface}"
+                 args += ' -k none -s 65535' if malware_file_capture
+                 args += ' --daq-var sbypassupperthreshold=0'
+                 args += ' --daq-var sbypasslowerthreshold=0'
+                 args += ' --daq-var sbypasssamplingrate=0'
+                 args += ' --treat-drop-as-alert' if mode == 'IDS_SPAN' || mode
                  args
                end
 
@@ -212,6 +244,8 @@ action :add do
                           'alert_kafka'
                         end
 
+        autobypass = group['autobypass'] ? 1 : 0
+
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
           cookbook 'snort3'
@@ -219,11 +253,22 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(iface: iface, cpu_cores: cpu_cores, threads: threads, mode: mode, inline: inline, args: args, output_plugin: output_plugin)
+          variables(segment: segment, autobypass: autobypass, iface: iface, cpu_cores: cpu_cores, threads: threads, mode: mode, inline: inline, args: args, output_plugin: output_plugin)
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
 
+        ruby_block "disable_receive_offload_on_#{instance_name}" do
+          block do
+            interfaces = iface.include?(':') ? iface.split(':') : [iface]
+            interfaces.each do |intf|
+              Chef::Log.info("Disabling GRO and LRO on #{intf}")
+              system("ethtool -K #{intf} gro off lro off")
+            end
+          end
+          only_if { ::File.exist?("/etc/snort/#{instance_name}/env") }
+        end
+  
         template "/etc/snort/#{instance_name}/snort.rules" do
           source 'empty.erb'
           cookbook 'snort3'
