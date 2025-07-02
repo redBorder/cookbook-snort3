@@ -1,6 +1,12 @@
 cookbook-snort3 CHANGELOG
 ===============
 
+## 0.1.7
+
+  - Miguel Alvarez
+    - [6f279f7] Remove force-setenforce 0 (#12)
+    - [280c06a] Add intrusion thresholds (#11)
+
 ## 0.1.6
 
   - Miguel Alvarez
