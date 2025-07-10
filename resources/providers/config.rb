@@ -5,6 +5,7 @@ action :add do
   begin
     sensor_id = new_resource.sensor_id
     groups = new_resource.groups
+    http_param_threshold = new_resource.http_param_threshold
 
     ruby_block 'check_bpctl_mod' do
       block do
@@ -183,7 +184,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(instance_name: instance_name, group: group, sensor_id: sensor_id, group_name: group_name)
+          variables(instance_name: instance_name, group: group, sensor_id: sensor_id, group_name: group_name, http_param_threshold: http_param_threshold)
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
