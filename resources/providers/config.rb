@@ -282,6 +282,17 @@ action :add do
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
+
+        template "/etc/snort/#{instance_name}/snort_defaults.lua" do
+          source 'snort_defaults.lua.erb'
+          cookbook 'snort3'
+          owner 'root'
+          group 'root'
+          mode '0644'
+          retries 2
+          notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
+          notifies :start, "service[snort3@#{instance_name}.service]", :delayed
+        end
       end
     end
 

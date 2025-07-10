@@ -12,6 +12,7 @@ daq = {
 -- 1. configure defaults
 ---------------------------------------------------------------------------
 
+include '/etc/snort/<%=@instance_name%>/snort_defaults.lua'
 include '/etc/snort/<%=@instance_name%>/snort-variables.conf'
 
 ---------------------------------------------------------------------------
@@ -60,11 +61,11 @@ dce_udp = { }
 dce_http_proxy = { }
 dce_http_server = { }
 
---gtp_inspect = default_gtp
+gtp_inspect = default_gtp
 port_scan = default_med_port_scan
---smtp = default_smtp
+smtp = default_smtp
 
---ftp_server = default_ftp_server
+ftp_server = default_ftp_server
 ftp_client = { }
 ftp_data = { }
 
@@ -86,7 +87,7 @@ reputation = {
 -- 3. configure bindings
 ---------------------------------------------------------------------------
 
---wizard = default_wizard
+wizard = default_wizard
 
 binder =
 {
@@ -95,7 +96,7 @@ binder =
     { when = { proto = 'tcp', ports = '53', role='server' },  use = { type = 'dns' } },
     { when = { proto = 'tcp', ports = '111', role='server' }, use = { type = 'rpc_decode' } },
     { when = { proto = 'tcp', ports = '502', role='server' }, use = { type = 'modbus' } },
---    { when = { proto = 'tcp', ports = '2123 2152 3386', role='server' }, use = { type = 'gtp_inspect' } },
+    { when = { proto = 'tcp', ports = '2123 2152 3386', role='server' }, use = { type = 'gtp_inspect' } },
     { when = { proto = 'tcp', ports = '2404', role='server' }, use = { type = 'iec104' } },
     { when = { proto = 'udp', ports = '2222', role = 'server' }, use = { type = 'cip' } },
     { when = { proto = 'tcp', ports = '44818', role = 'server' }, use = { type = 'cip' } },
@@ -111,9 +112,9 @@ binder =
     { when = { service = 'cip' },              use = { type = 'cip' } },
     { when = { service = 'dnp3' },             use = { type = 'dnp3' } },
     { when = { service = 'dns' },              use = { type = 'dns' } },
---  { when = { service = 'ftp' },              use = { type = 'ftp_server' } },
+    { when = { service = 'ftp' },              use = { type = 'ftp_server' } },
     { when = { service = 'ftp-data' },         use = { type = 'ftp_data' } },
---    { when = { service = 'gtp' },              use = { type = 'gtp_inspect' } },
+    { when = { service = 'gtp' },              use = { type = 'gtp_inspect' } },
     { when = { service = 'imap' },             use = { type = 'imap' } },
     { when = { service = 'http' },             use = { type = 'http_inspect' } },
     { when = { service = 'http2' },            use = { type = 'http2_inspect' } },
@@ -123,13 +124,13 @@ binder =
     { when = { service = 'pop3' },             use = { type = 'pop' } },
     { when = { service = 'ssh' },              use = { type = 'ssh' } },
     { when = { service = 'sip' },              use = { type = 'sip' } },
---    { when = { service = 'smtp' },             use = { type = 'smtp' } },
+    { when = { service = 'smtp' },             use = { type = 'smtp' } },
     { when = { service = 'ssl' },              use = { type = 'ssl' } },
     { when = { service = 'sunrpc' },           use = { type = 'rpc_decode' } },
     { when = { service = 's7commplus' },       use = { type = 's7commplus' } },
     { when = { service = 'telnet' },           use = { type = 'telnet' } },
 
-  --  { use = { type = 'wizard' } }
+    { use = { type = 'wizard' } }
 }
 
 ---------------------------------------------------------------------------
@@ -195,6 +196,17 @@ ips =
 ---------------------------------------------------------------------------
 
 include('/etc/snort/<%=@instance_name%>/events.lua')
+
+---------------------------------------------------------------------------
+-- LibML. Neural Network Based Exploit Detection
+---------------------------------------------------------------------------
+
+snort_ml_engine = {
+    http_param_model= "/etc/snort/ml_models/snort.model",
+}
+snort_ml = {
+    http_param_threshold = <%=@http_param_threshold%>
+}
 
 ---------------------------------------------------------------------------
 -- 7. configure outputs
