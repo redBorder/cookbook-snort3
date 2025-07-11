@@ -7,6 +7,10 @@ action :add do
     groups = new_resource.groups
     http_param_threshold = new_resource.http_param_threshold
 
+    ml_detection_enabled   = node["redborder"]["ml_detection"]["enabled"]
+    ml_detection_threshold  = node["redborder"]["ml_detection"]["threshold"]
+    ml_detection_action     = node["redborder"]["ml_detection"]["action"]    
+
     ruby_block 'check_bpctl_mod' do
       block do
         module_loaded = `lsmod | grep bpctl_mod`
@@ -177,6 +181,17 @@ action :add do
           sensor_id = 0
         end
 
+        template "/etc/snort/#{instance_name}/ml.rules" do
+          source 'empty.erb'
+          cookbook 'snort3'
+          owner 'root'
+          group 'root'
+          mode '0644'
+          retries 2
+          variables(ml_detection_action: ml_detection_action)
+          not_if { ::File.exist?("/etc/snort/#{instance_name}/ml.rules") && !::File.zero?("/etc/snort/#{instance_name}/ml.rules") }
+        end
+
         template "/etc/snort/#{instance_name}/config.lua" do
           source 'config.lua.erb'
           cookbook 'snort3'
@@ -184,7 +199,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(instance_name: instance_name, group: group, sensor_id: sensor_id, group_name: group_name, http_param_threshold: http_param_threshold)
+          variables(instance_name: instance_name, group: group, sensor_id: sensor_id, group_name: group_name, ml_detection_threshold: ml_detection_threshold, ml_detection_enabled: ml_detection_enabled)
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
