@@ -5,7 +5,6 @@ action :add do
   begin
     sensor_id = new_resource.sensor_id
     groups = new_resource.groups
-    http_param_threshold = new_resource.http_param_threshold
 
     ml_detection_enabled    = node["redborder"]["ml_detection"]["enabled"] || false
     ml_detection_threshold  = node["redborder"]["ml_detection"]["threshold"] || 0.95
