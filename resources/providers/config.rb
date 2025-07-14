@@ -6,9 +6,9 @@ action :add do
     sensor_id = new_resource.sensor_id
     groups = new_resource.groups
 
-    ml_detection_enabled    = node["redborder"]["ml_detection"]["enabled"] || false
-    ml_detection_threshold  = node["redborder"]["ml_detection"]["threshold"] || 0.95
-    ml_detection_action     = node["redborder"]["ml_detection"]["action"]  || "alert"
+    ml_detection_enabled    = node['redborder']['ml_detection']['enabled'] || false
+    ml_detection_threshold  = node['redborder']['ml_detection']['threshold'] || 0.95
+    ml_detection_action     = node['redborder']['ml_detection']['action'] || 'alert'
 
     ruby_block 'check_bpctl_mod' do
       block do
@@ -282,8 +282,8 @@ action :add do
           not_if { ::File.exist?("/etc/snort/#{instance_name}/snort.rules") && !::File.zero?("/etc/snort/#{instance_name}/snort.rules") }
         end
 
-        if mode == "IDS" || mode == "IDS_SPAN" || mode == "IDS_FWD"
-          ml_detection_action = "alert"
+        if mode == 'IDS' || mode == 'IDS_SPAN' || mode == 'IDS_FWD'
+          ml_detection_action = 'alert'
         end
 
         template "/etc/snort/#{instance_name}/ml.rules" do
