@@ -6,9 +6,9 @@ action :add do
     sensor_id = new_resource.sensor_id
     groups = new_resource.groups
 
-    ml_detection_enabled    = node['redborder']['ml_detection']['enabled'] || false
-    ml_detection_threshold  = node['redborder']['ml_detection']['threshold'] || 0.95
-    ml_detection_action     = node['redborder']['ml_detection']['action'] || 'alert'
+    ml_detection_enabled   = node.dig('redborder', 'ml_detection', 'enabled')   || false
+    ml_detection_threshold = node.dig('redborder', 'ml_detection', 'threshold') || 0.95
+    ml_detection_action    = node.dig('redborder', 'ml_detection', 'action')    || 'alert'
 
     ruby_block 'check_bpctl_mod' do
       block do
