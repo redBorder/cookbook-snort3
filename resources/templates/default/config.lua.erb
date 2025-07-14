@@ -197,18 +197,17 @@ ips =
 
 include('/etc/snort/<%=@instance_name%>/events.lua')
 
-<% if File.exist?('/etc/snort/<%=@instance_name%>/ml_models/snort.model') && @ml_detection_enabled%>
+<% if File.exist?("/etc/snort/#{@instance_name}/ml_models/snort.model") and @ml_detection_enabled %>
 
-include('/etc/snort/<%=@instance_name%>/ml.rules')
 ---------------------------------------------------------------------------
 -- LibML. Neural Network Based Exploit Detection
 ---------------------------------------------------------------------------
 
 snort_ml_engine = {
-    http_param_model= "/etc/snort/ml_models/snort.model",
+  http_param_model= "/etc/snort/<%=@instance_name%>/ml_models/snort.model",
 }
 snort_ml = {
-    http_param_threshold = <%=@ml_detection_threshold%>
+    http_param_threshold = <%= @ml_detection_threshold %>
 }
 <% end %>
 
