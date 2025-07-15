@@ -6,6 +6,12 @@ action :add do
     sensor_id = new_resource.sensor_id
     groups = new_resource.groups
 
+    ml_detection_enabled            = node.dig('redborder', 'ml_detection', 'enabled')            || false
+    ml_detection_threshold          = node.dig('redborder', 'ml_detection', 'threshold')          || 0.95
+    ml_detection_action             = node.dig('redborder', 'ml_detection', 'action')             || 'alert'
+    ml_detection_uri_depth          = node.dig('redborder', 'ml_detection', 'uri_depth')          || -1
+    ml_detection_client_body_depth  = node.dig('redborder', 'ml_detection', 'client_body_depth')  || 100
+
     ruby_block 'check_bpctl_mod' do
       block do
         module_loaded = `lsmod | grep bpctl_mod`
@@ -183,34 +189,78 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(instance_name: instance_name, group: group, sensor_id: sensor_id, group_name: group_name)
+          variables(instance_name: instance_name, group: group, sensor_id: sensor_id, group_name: group_name, ml_detection_threshold: ml_detection_threshold, ml_detection_enabled: ml_detection_enabled, ml_detection_uri_depth: ml_detection_uri_depth, ml_detection_client_body_depth: ml_detection_client_body_depth)
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
 
+        segment = group['segments'].join(' ')
         iface = `ip link show master #{group['segments'].join(' ')} | grep '^[0-9]' | awk '{print $2}' | cut -d':' -f1 | paste -sd ":"`.chomp!
         threads = group['cpu_list'].size
         cpu_cores = group['cpu_list'].join(' ')
         mode = group['mode']
         inline = (mode != 'IDS' && mode != 'IDS_SPAN') && (mode == 'IPS' || mode == 'IDS_FWD' || mode == 'IPS_TEST')
+
+        # This should be redborder_afpacket_sbypass_profile
+        case group['pfring_sbypass_profile']
+        when '1' # connectivity
+          sbypass_upper = 60
+          sbypass_lower = 10
+          sbypass_rate  = 5000
+        when '2' # balanced
+          sbypass_upper = 75
+          sbypass_lower = 25
+          sbypass_rate  = 2000
+        when '3' # security
+          sbypass_upper = 90
+          sbypass_lower = 40
+          sbypass_rate  = 2000
+        else
+          sbypass_upper = 0
+          sbypass_lower = 0
+          sbypass_rate  = 0
+        end
+
+        # This will be for malware
+        malware_file_capture = false
         args = if inline
-                 args = "--daq afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}" # IPS_TEST
-                 args = "#{args} --treat-drop-as-alert" if mode == 'IDS_FWD' || mode == 'IDS'
+                 args = "--daq redborder_afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}"
+                 args += ' -k none -s 65535' if malware_file_capture
+                 args += " --daq-var sbypassupperthreshold=#{sbypass_upper}"
+                 args += " --daq-var sbypasslowerthreshold=#{sbypass_lower}"
+                 args += " --daq-var sbypasssamplingrate=#{sbypass_rate}"
+                 args += ' --treat-drop-as-alert' if mode == 'IDS_FWD' || mode == 'IDS'
                  args
                else
-                 args = "--daq afpacket --daq-var fanout_type=hash -i #{iface}"
-                 args = "#{args} --treat-drop-as-alert" if mode == 'IDS_SPAN' || mode
+                 args = "--daq redborder_afpacket --daq-var fanout_type=hash -i #{iface}"
+                 args += ' -k none -s 65535' if malware_file_capture
+                 args += ' --daq-var sbypassupperthreshold=0'
+                 args += ' --daq-var sbypasslowerthreshold=0'
+                 args += ' --daq-var sbypasssamplingrate=0'
+                 args += ' --treat-drop-as-alert' if mode == 'IDS_SPAN' || mode
                  args
                end
 
         args = "-Q #{args}" if mode == 'IPS'
-
         output_plugin = ''
         output_plugin = if node['redborder']['cloud'] == true || node['redborder']['cloud'].to_s == '1'
                           'alert_http'
                         else
                           'alert_kafka'
                         end
+
+        ruby_block "disable_receive_offload_on_#{instance_name}" do
+          block do
+            interfaces = iface.include?(':') ? iface.split(':') : [iface]
+            interfaces.each do |intf|
+              Chef::Log.info("Disabling GRO and LRO on #{intf}")
+              system("ethtool -K #{intf} gro off lro off")
+            end
+          end
+          only_if { ::File.exist?("/etc/snort/#{instance_name}/env") }
+        end
+
+        autobypass = group['autobypass'] ? 1 : 0
 
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
@@ -219,7 +269,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(iface: iface, cpu_cores: cpu_cores, threads: threads, mode: mode, inline: inline, args: args, output_plugin: output_plugin)
+          variables(segment: segment, autobypass: autobypass, iface: iface, cpu_cores: cpu_cores, threads: threads, mode: mode, inline: inline, args: args, output_plugin: output_plugin)
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
@@ -232,6 +282,20 @@ action :add do
           mode '0644'
           retries 2
           not_if { ::File.exist?("/etc/snort/#{instance_name}/snort.rules") && !::File.zero?("/etc/snort/#{instance_name}/snort.rules") }
+        end
+
+        if mode == 'IDS' || mode == 'IDS_SPAN' || mode == 'IDS_FWD'
+          ml_detection_action = 'alert'
+        end
+
+        template "/etc/snort/#{instance_name}/ml.rules" do
+          source 'ml.rules.erb'
+          cookbook 'snort3'
+          owner 'root'
+          group 'root'
+          mode '0644'
+          retries 2
+          variables(ml_detection_action: ml_detection_action)
         end
 
         template "/etc/snort/#{instance_name}/events.lua" do
@@ -279,6 +343,17 @@ action :add do
           mode '0644'
           retries 2
           variables(vgroup: vgroup)
+          notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
+          notifies :start, "service[snort3@#{instance_name}.service]", :delayed
+        end
+
+        template "/etc/snort/#{instance_name}/snort_defaults.lua" do
+          source 'snort_defaults.lua.erb'
+          cookbook 'snort3'
+          owner 'root'
+          group 'root'
+          mode '0644'
+          retries 2
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
