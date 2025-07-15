@@ -6,9 +6,11 @@ action :add do
     sensor_id = new_resource.sensor_id
     groups = new_resource.groups
 
-    ml_detection_enabled   = node.dig('redborder', 'ml_detection', 'enabled')   || false
-    ml_detection_threshold = node.dig('redborder', 'ml_detection', 'threshold') || 0.95
-    ml_detection_action    = node.dig('redborder', 'ml_detection', 'action')    || 'alert'
+    ml_detection_enabled            = node.dig('redborder', 'ml_detection', 'enabled')            || false
+    ml_detection_threshold          = node.dig('redborder', 'ml_detection', 'threshold')          || 0.95
+    ml_detection_action             = node.dig('redborder', 'ml_detection', 'action')             || 'alert'
+    ml_detection_uri_depth          = node.dig('redborder', 'ml_detection', 'uri_depth')          || -1
+    ml_detection_client_body_depth  = node.dig('redborder', 'ml_detection', 'client_body_depth')  || 100
 
     ruby_block 'check_bpctl_mod' do
       block do
@@ -187,7 +189,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(instance_name: instance_name, group: group, sensor_id: sensor_id, group_name: group_name, ml_detection_threshold: ml_detection_threshold, ml_detection_enabled: ml_detection_enabled)
+          variables(instance_name: instance_name, group: group, sensor_id: sensor_id, group_name: group_name, ml_detection_threshold: ml_detection_threshold, ml_detection_enabled: ml_detection_enabled, ml_detection_uri_depth: ml_detection_uri_depth, ml_detection_client_body_depth: ml_detection_client_body_depth)
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
