@@ -207,7 +207,9 @@ snort_ml_engine = {
   http_param_model= "/etc/snort/<%=@instance_name%>/ml_models/snort.model",
 }
 snort_ml = {
-    http_param_threshold = <%= @ml_detection_threshold %>
+    http_param_threshold = <%= @ml_detection_threshold %>,
+    client_body_depth = 100,
+    uri_depth = -1
 }
 <% end %>
 
