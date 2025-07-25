@@ -96,42 +96,48 @@ action :add do
           action :create
         end
 
-        ruby_block 'copy_alerts_with_full_date_hour_shell' do
+        ruby_block 'copy_alerts_raw' do
           block do
             timestamp = Time.now.strftime('%Y-%m-%d_%H')
-            src_dir = '/etc/snort/0_default_0'
-            raw_dir = "#{src_dir}/raw"
-            dest_dir = "#{raw_dir}/#{timestamp}"
 
             system(<<-EOS
-              mkdir -p "#{dest_dir}"
-              cd "#{src_dir}" || exit 1
+              find /etc/snort -type d \\( -path '*/raw*' -o -path '*/.*' \\) -prune -o -type d -print | while read src_dir; do
+                cd "$src_dir" || continue
 
-              for file in *_alert_full.txt; do
-                [ -e "$file" ] || continue
+                files=$(ls *_alert_full.txt 2>/dev/null)
+                [ -z "$files" ] && continue
 
-                base_name="$(basename "$file")"
-                name="${base_name%.*}"
-                ext="${base_name##*.}"
+                raw_dir="$src_dir/raw"
+                dest_dir="$raw_dir/#{timestamp}"
 
-                dest_file="#{dest_dir}/$base_name"
+                mkdir -p "$dest_dir"
 
-                if [ -e "$dest_file" ]; then
-                  i=1
-                  while [ -e "#{dest_dir}/$name_$i.$ext" ]; do
-                    i=$((i + 1))
-                  done
-                  dest_file="#{dest_dir}/$name_$i.$ext"
-                fi
+                for file in $files; do
+                  [ -e "$file" ] || continue
 
-                cp -f "$file" "$dest_file"
-                : > "$file"
-                echo "Copied $file to $dest_file and truncated original"
+                  base_name="$(basename "$file")"
+                  name="${base_name%.*}"
+                  ext="${base_name##*.}"
+
+                  dest_file="$dest_dir/$base_name"
+
+                  if [ -e "$dest_file" ]; then
+                    i=1
+                    while [ -e "$dest_dir/${name}_$i.$ext" ]; do
+                      i=$((i + 1))
+                    done
+                    dest_file="$dest_dir/${name}_$i.$ext"
+                  fi
+
+                  cp -f "$file" "$dest_file"
+                  : > "$file"
+                  echo "Copied $file to $dest_file and truncated original"
+                done
+
+                find "$dest_dir" -type f -size 0 -name '*.txt' -delete
               done
-
-              find "#{dest_dir}" -type f -size 0 -name '*.txt' -delete
             EOS
-                  )
+            )
           end
           action :run
         end
@@ -223,7 +229,36 @@ action :add do
 
         # This will be for malware
         malware_file_capture = false
+
+        # This should be redborder_afpacket_sbypass_profile
+        case group['pfring_sbypass_profile']
+        when '1' # connectivity
+          sbypass_upper = 60
+          sbypass_lower = 10
+          sbypass_rate  = 5000
+        when '2' # balanced
+          sbypass_upper = 75
+          sbypass_lower = 25
+          sbypass_rate  = 2000
+        when '3' # security
+          sbypass_upper = 90
+          sbypass_lower = 40
+          sbypass_rate  = 2000
+        else
+          sbypass_upper = 0
+          sbypass_lower = 0
+          sbypass_rate  = 0
+        end
+
+        # This will be for malware
+        malware_file_capture = false
         args = if inline
+                 args = "--daq redborder_afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}"
+                 args += ' -k none -s 65535' if malware_file_capture
+                 args += " --daq-var sbypassupperthreshold=#{sbypass_upper}"
+                 args += " --daq-var sbypasslowerthreshold=#{sbypass_lower}"
+                 args += " --daq-var sbypasssamplingrate=#{sbypass_rate}"
+                 args += ' --treat-drop-as-alert' if mode == 'IDS_FWD' || mode == 'IDS'
                  args = "--daq redborder_afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}"
                  args += ' -k none -s 65535' if malware_file_capture
                  args += " --daq-var sbypassupperthreshold=#{sbypass_upper}"
@@ -232,6 +267,12 @@ action :add do
                  args += ' --treat-drop-as-alert' if mode == 'IDS_FWD' || mode == 'IDS'
                  args
                else
+                 args = "--daq redborder_afpacket --daq-var fanout_type=hash -i #{iface}"
+                 args += ' -k none -s 65535' if malware_file_capture
+                 args += ' --daq-var sbypassupperthreshold=0'
+                 args += ' --daq-var sbypasslowerthreshold=0'
+                 args += ' --daq-var sbypasssamplingrate=0'
+                 args += ' --treat-drop-as-alert' if mode == 'IDS_SPAN' || mode
                  args = "--daq redborder_afpacket --daq-var fanout_type=hash -i #{iface}"
                  args += ' -k none -s 65535' if malware_file_capture
                  args += ' --daq-var sbypassupperthreshold=0'
@@ -262,6 +303,8 @@ action :add do
 
         autobypass = group['autobypass'] ? 1 : 0
 
+        autobypass = group['autobypass'] ? 1 : 0
+
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
           cookbook 'snort3'
@@ -274,6 +317,17 @@ action :add do
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
 
+        ruby_block "disable_receive_offload_on_#{instance_name}" do
+          block do
+            interfaces = iface.include?(':') ? iface.split(':') : [iface]
+            interfaces.each do |intf|
+              Chef::Log.info("Disabling GRO and LRO on #{intf}")
+              system("ethtool -K #{intf} gro off lro off")
+            end
+          end
+          only_if { ::File.exist?("/etc/snort/#{instance_name}/env") }
+        end
+  
         template "/etc/snort/#{instance_name}/snort.rules" do
           source 'empty.erb'
           cookbook 'snort3'
