@@ -1,6 +1,21 @@
 cookbook-snort3 CHANGELOG
 ===============
 
+## 1.0.0
+
+  - Miguel Alvarez
+    - [7cb1838] Intrusion Sensor Release
+    - [26128cf] Config BODY model
+    - [fadec4e] Use LibML
+    - [a5fe057] Add http_param_thresholds
+    - [139931f] Add LibML
+    - [e52d35c] Add new params to configure fifo queue
+    - [e8be981] Add ENV
+    - [d170561] Add software bypass profiles
+    - [6f279f7] Remove force-setenforce 0 (#12)
+    - [280c06a] Add intrusion thresholds (#11)
+    - [e89f4df] Add segment init
+
 ## 0.1.7
 
   - Miguel Alvarez
