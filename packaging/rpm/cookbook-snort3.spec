@@ -37,7 +37,8 @@ case "$1" in
 esac
 
 %files
-%defattr(0755,root,root)
+%defattr(0644,root,root)
+%attr(0755,root,root)
 /var/chef/cookbooks/snort3
 %defattr(0644,root,root)
 /var/chef/cookbooks/snort3/README.md
