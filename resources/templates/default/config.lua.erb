@@ -199,21 +199,31 @@ include('/etc/snort/<%=@instance_name%>/events.lua')
 
 <% if File.exist?("/etc/snort/#{@instance_name}/ml_models/snort.model") and @ml_detection_enabled %>
 
+<% if File.size?("/etc/snort/#{@instance_name}/ml_models/snort.model") %>
 ---------------------------------------------------------------------------
 -- LibML. Neural Network Based Exploit Detection
 ---------------------------------------------------------------------------
 
 snort_ml_engine = {
-  http_param_model= "/etc/snort/<%=@instance_name%>/ml_models/snort.model",
+  http_param_models = {
+    { path = "/etc/snort/<%= @instance_name %>/ml_models/snort.model" },
+  },
+  ftp_cmd_models = {
+    { path = "/etc/snort/<%= @instance_name %>/ml_models/snort.model" }
+  }
 }
 
 snort_ml = {
   http_param_threshold = <%= @ml_detection_threshold %>,
+  ftp_cmd_threshold = 0.01,
+  client_body_depth = <%= @ml_detection_client_body_depth %>,
   uri_depth = <%= @ml_detection_uri_depth %>,
-  client_body_depth = <%= @ml_detection_client_body_depth %>
+  ftp_request_depth = -1,
+  ftp_response_depth = -1
 }
 <% end %>
 
+<% end %>
 ---------------------------------------------------------------------------
 -- 7. configure outputs
 ---------------------------------------------------------------------------
