@@ -4,3 +4,5 @@ Chef/Deprecations/ResourceWithoutUnifiedTrue:
 Style/IdenticalConditionalBranches:
   Enabled: false
 
+Lint/UselessAssignment:
+  Enabled: false

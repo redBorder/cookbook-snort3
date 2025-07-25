@@ -255,6 +255,12 @@ snort_ml = {
 
 <% end %>
 
+---------------------------------------------------------------------------
+-- Search Engine
+---------------------------------------------------------------------------
+
+search_engine = { search_method = 'hyperscan'}
+
 <%#— pick mode based on cloud flag —%>
 <% if node["redborder"]["cloud"] == true || node["redborder"]["cloud"].to_s == "1" %>
 

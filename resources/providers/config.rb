@@ -137,7 +137,7 @@ action :add do
                 find "$dest_dir" -type f -size 0 -name '*.txt' -delete
               done
             EOS
-            )
+                  )
           end
           action :run
         end
@@ -327,7 +327,7 @@ action :add do
           end
           only_if { ::File.exist?("/etc/snort/#{instance_name}/env") }
         end
-  
+
         template "/etc/snort/#{instance_name}/snort.rules" do
           source 'empty.erb'
           cookbook 'snort3'
