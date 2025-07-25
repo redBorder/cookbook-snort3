@@ -1,6 +1,11 @@
 cookbook-snort3 CHANGELOG
 ===============
 
+## 1.0.1
+
+  - jnavarrorb
+    - [ff66d9b] Remove executable permissions on non-executable files
+
 ## 1.0.0
 
   - Miguel Alvarez
