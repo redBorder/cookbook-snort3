@@ -142,46 +142,6 @@ action :add do
           action :run
         end
 
-        ruby_block 'copy_alerts_with_full_date_hour_shell' do
-          block do
-            timestamp = Time.now.strftime('%Y-%m-%d_%H')
-            src_dir = '/etc/snort/0_default_0'
-            raw_dir = "#{src_dir}/raw"
-            dest_dir = "#{raw_dir}/#{timestamp}"
-
-            system(<<-EOS
-              mkdir -p "#{dest_dir}"
-              cd "#{src_dir}" || exit 1
-
-              for file in *_alert_full.txt; do
-                [ -e "$file" ] || continue
-
-                base_name="$(basename "$file")"
-                name="${base_name%.*}"
-                ext="${base_name##*.}"
-
-                dest_file="#{dest_dir}/$base_name"
-
-                if [ -e "$dest_file" ]; then
-                  i=1
-                  while [ -e "#{dest_dir}/$name_$i.$ext" ]; do
-                    i=$((i + 1))
-                  done
-                  dest_file="#{dest_dir}/$name_$i.$ext"
-                fi
-
-                cp -f "$file" "$dest_file"
-                : > "$file"
-                echo "Copied $file to $dest_file and truncated original"
-              done
-
-              find "#{dest_dir}" -type f -size 0 -name '*.txt' -delete
-            EOS
-                  )
-          end
-          action :run
-        end
-
         begin
           sensor_id = node['redborder']['sensor_id'].to_i
         rescue
@@ -206,29 +166,6 @@ action :add do
         cpu_cores = group['cpu_list'].join(' ')
         mode = group['mode']
         inline = (mode != 'IDS' && mode != 'IDS_SPAN') && (mode == 'IPS' || mode == 'IDS_FWD' || mode == 'IPS_TEST')
-
-        # This should be redborder_afpacket_sbypass_profile
-        case group['pfring_sbypass_profile']
-        when '1' # connectivity
-          sbypass_upper = 60
-          sbypass_lower = 10
-          sbypass_rate  = 5000
-        when '2' # balanced
-          sbypass_upper = 75
-          sbypass_lower = 25
-          sbypass_rate  = 2000
-        when '3' # security
-          sbypass_upper = 90
-          sbypass_lower = 40
-          sbypass_rate  = 2000
-        else
-          sbypass_upper = 0
-          sbypass_lower = 0
-          sbypass_rate  = 0
-        end
-
-        # This will be for malware
-        malware_file_capture = false
 
         # This should be redborder_afpacket_sbypass_profile
         case group['pfring_sbypass_profile']
@@ -303,8 +240,6 @@ action :add do
 
         autobypass = group['autobypass'] ? 1 : 0
 
-        autobypass = group['autobypass'] ? 1 : 0
-
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
           cookbook 'snort3'
@@ -315,17 +250,6 @@ action :add do
           variables(segment: segment, autobypass: autobypass, iface: iface, cpu_cores: cpu_cores, threads: threads, mode: mode, inline: inline, args: args, output_plugin: output_plugin)
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
-        end
-
-        ruby_block "disable_receive_offload_on_#{instance_name}" do
-          block do
-            interfaces = iface.include?(':') ? iface.split(':') : [iface]
-            interfaces.each do |intf|
-              Chef::Log.info("Disabling GRO and LRO on #{intf}")
-              system("ethtool -K #{intf} gro off lro off")
-            end
-          end
-          only_if { ::File.exist?("/etc/snort/#{instance_name}/env") }
         end
 
         template "/etc/snort/#{instance_name}/snort.rules" do
