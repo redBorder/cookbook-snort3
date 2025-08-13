@@ -81,7 +81,6 @@ action :add do
         end
 
         instance_params = get_instance_parameters(group)
-        malware_file_capture = instance_params[:malware]
 
         args = get_snort_args(
           instance_params[:inline],
@@ -90,7 +89,7 @@ action :add do
           instance_params[:sbypass_upper],
           instance_params[:sbypass_lower],
           instance_params[:sbypass_rate],
-          malware_file_capture
+          instance_params[:malware]
         )
 
         execute 'rb_configure_ifaces' do
