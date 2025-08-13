@@ -26,6 +26,11 @@ action :add do
       action :run
     end
 
+    execute 'rb_configure_ifaces' do
+      command '/bin/env WAIT=1 /usr/lib/redborder/bin/rb_configure_ifaces.sh'
+      run_action :run
+    end
+
     groups.each do |group|
       group_name = group['name']
       default_added = false
@@ -91,11 +96,6 @@ action :add do
           instance_params[:sbypass_rate],
           instance_params[:malware]
         )
-
-        execute 'rb_configure_ifaces' do
-          command '/bin/env WAIT=1 /usr/lib/redborder/bin/rb_configure_ifaces.sh'
-          run_action :run
-        end
 
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
