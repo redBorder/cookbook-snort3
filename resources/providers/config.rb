@@ -38,6 +38,7 @@ action :add do
         service "snort3@#{instance_name}.service" do
           action [:enable]
         end
+
         %w(reload restart stop start).each do |s_action|
           execute "#{s_action}_snort3@#{instance_name}" do
             command "/bin/env WAIT=1 /bin/systemctl #{s_action} snort3@#{instance_name}.service"
@@ -87,8 +88,6 @@ action :add do
           malware_file_capture
         )
 
-        output_plugin = Snort3::Helpers.get_output_plugin(node)
-
         execute 'rb_configure_ifaces' do
           command '/bin/env WAIT=1 /usr/lib/redborder/rb_configure_ifaces.sh'
           run_action :run
@@ -101,7 +100,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(segment: instance_params[:segment], autobypass: autobypass, iface: instance_params[:iface], cpu_cores: instance_params[:cpu_cores], threads: instance_params[:threads], mode: instance_params[:mode], inline: instance_params[:inline], args: args, output_plugin: output_plugin)
+          variables(segment: instance_params[:segment], autobypass: autobypass, iface: instance_params[:iface], cpu_cores: instance_params[:cpu_cores], threads: instance_params[:threads], mode: instance_params[:mode], inline: instance_params[:inline], args: args, output_plugin: Snort3::Helpers.get_output_plugin(node))
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
