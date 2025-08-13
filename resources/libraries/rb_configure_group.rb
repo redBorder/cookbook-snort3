@@ -1,6 +1,6 @@
 module SnortGroup
   module Helpers
-    def configure_group(group, node)
+    def configure_group(group, node, default_added)
       vgroup = group['bindings'][id_str].to_hash.clone
       vgroup_name    = vgroup['name'].nil? ? 'default' : vgroup['name'].to_s
       vgroup['name'] = vgroup_name
@@ -12,7 +12,7 @@ module SnortGroup
 
       if !has_vlans && !has_network
         if default_added
-          next
+          return default_added
         else
           default_added = true
         end
@@ -25,6 +25,8 @@ module SnortGroup
       if vgroup['portvars'].nil? || vgroup['portvars'].empty?
         vgroup['portvars'] = node['redborder']['snort']['default']['portvars']
       end
+
+      default_added
     end
   end
 end

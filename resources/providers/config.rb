@@ -30,7 +30,7 @@ action :add do
         .sort
         .map(&:to_s)
         .each do |_id_str|
-        SnortGroup::Helpers.configure_group(group, node)
+        default_added = SnortGroup::Helpers.configure_group(group, node, default_added)
 
         instance_name = "#{group['instances_group']}_#{group['name']}_#{binding_id}"
         valid_instance_names << "snort3@#{instance_name}.service"
