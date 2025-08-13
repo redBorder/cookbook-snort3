@@ -27,7 +27,7 @@ module Snort3
       if node['redborder']['cloud'] == true || node['redborder']['cloud'].to_s == '1'
         'alert_http'
       else
-        'alert_syslog'
+        'alert_kafka'
       end
     end
 
@@ -51,6 +51,10 @@ module Snort3
         sbypass_rate  = 0
       end
       [sbypass_upper, sbypass_lower, sbypass_rate]
+    end
+
+    def get_autobypass(group)
+      group['autobypass'] ? 1 : 0
     end
 
     def get_instance_parameters(group)

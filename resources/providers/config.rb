@@ -1,14 +1,19 @@
 # Cookbook:: snort3
 # Provider:: config
 
+include SnortGroup::Helpers
+include System::Helpers
+include Snort3::Helpers
+include Sensor::Helpers
+
 action :add do
   begin
     sensor_id = new_resource.sensor_id
     groups = new_resource.groups
 
-    ml_actions = Snort3::Helpers.get_snort_default_ml_actions(node)
+    ml_actions = get_snort_default_ml_actions(node)
 
-    System::Helpers.check_bpctl_mod
+    check_bpctl_mod
 
     dnf_package 'snort3' do
       action :upgrade
@@ -17,7 +22,7 @@ action :add do
     valid_instance_names = []
 
     execute 'rb_copy_raw_alerts' do
-      command '/bin/env WAIT=1 /usr/lib/redborder/rb_copy_raw_alerts.sh'
+      command '/bin/env WAIT=1 /usr/lib/redborder/bin/rb_copy_raw_alerts.sh'
       action :run
     end
 
@@ -29,8 +34,8 @@ action :add do
         .map(&:to_i)
         .sort
         .map(&:to_s)
-        .each do |_id_str|
-        default_added = SnortGroup::Helpers.configure_group(group, node, default_added)
+        .each do |id_str|
+        default_added, binding_id, vgroup = configure_group(group, node, default_added, id_str)
 
         instance_name = "#{group['instances_group']}_#{group['name']}_#{binding_id}"
         valid_instance_names << "snort3@#{instance_name}.service"
@@ -70,15 +75,15 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(instance_name: instance_name, group: group, sensor_id: Sensor::Helpers.get_sensor_id(node), group_name: group_name, ml_detection_threshold: ml_actions[:ml_detection_threshold], ml_detection_enabled: ml_actions[:ml_detection_enabled], ml_detection_uri_depth: ml_actions[:ml_detection_uri_depth], ml_detection_client_body_depth: ml_actions[:ml_detection_client_body_depth])
+          variables(instance_name: instance_name, group: group, sensor_id: get_sensor_id(node), group_name: group_name, ml_detection_threshold: ml_actions[:ml_detection_threshold], ml_detection_enabled: ml_actions[:ml_detection_enabled], ml_detection_uri_depth: ml_actions[:ml_detection_uri_depth], ml_detection_client_body_depth: ml_actions[:ml_detection_client_body_depth])
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
 
-        instance_params = Snort3::Helpers.get_instance_parameters(group)
+        instance_params = get_instance_parameters(group)
         malware_file_capture = instance_params[:malware]
 
-        args = Snort3::Helpers.get_snort_args(
+        args = get_snort_args(
           instance_params[:inline],
           instance_params[:iface],
           instance_params[:mode],
@@ -89,7 +94,7 @@ action :add do
         )
 
         execute 'rb_configure_ifaces' do
-          command '/bin/env WAIT=1 /usr/lib/redborder/rb_configure_ifaces.sh'
+          command '/bin/env WAIT=1 /usr/lib/redborder/bin/rb_configure_ifaces.sh'
           run_action :run
         end
 
@@ -100,7 +105,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(segment: instance_params[:segment], autobypass: autobypass, iface: instance_params[:iface], cpu_cores: instance_params[:cpu_cores], threads: instance_params[:threads], mode: instance_params[:mode], inline: instance_params[:inline], args: args, output_plugin: Snort3::Helpers.get_output_plugin(node))
+          variables(segment: instance_params[:segment], autobypass: get_autobypass(group), iface: instance_params[:iface], cpu_cores: instance_params[:cpu_cores], threads: instance_params[:threads], mode: instance_params[:mode], inline: instance_params[:inline], args: args, output_plugin: get_output_plugin(node))
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
@@ -122,7 +127,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(ml_detection_action: Snort3::Helpers.get_ml_detection_action(instance_params[:mode]))
+          variables(ml_detection_action: get_ml_detection_action(instance_params[:mode]))
         end
 
         template "/etc/snort/#{instance_name}/events.lua" do
