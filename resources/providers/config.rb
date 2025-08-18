@@ -1,36 +1,35 @@
 # Cookbook:: snort3
 # Provider:: config
 
+include SnortGroup::Helpers
+include System::Helpers
+include Snort3::Helpers
+include Sensor::Helpers
+
 action :add do
   begin
     sensor_id = new_resource.sensor_id
     groups = new_resource.groups
 
-    ml_detection_enabled            = node.dig('redborder', 'ml_detection', 'enabled')            || false
-    ml_detection_threshold          = node.dig('redborder', 'ml_detection', 'threshold')          || 0.95
-    ml_detection_action             = node.dig('redborder', 'ml_detection', 'action')             || 'alert'
-    ml_detection_uri_depth          = node.dig('redborder', 'ml_detection', 'uri_depth')          || -1
-    ml_detection_client_body_depth  = node.dig('redborder', 'ml_detection', 'client_body_depth')  || 100
+    ml_actions = get_snort_default_ml_actions(node)
 
-    ruby_block 'check_bpctl_mod' do
-      block do
-        module_loaded = `lsmod | grep bpctl_mod`
-
-        if module_loaded.strip.empty?
-          Chef::Log.warn('bpctl_mod is not loaded. injecting the module...')
-          system('bpctl_start')
-        else
-          Chef::Log.info('bpctl_mod is already loaded.')
-        end
-      end
-      action :run
-    end
+    check_bpctl_mod
 
     dnf_package 'snort3' do
       action :upgrade
     end
 
     valid_instance_names = []
+
+    execute 'rb_copy_raw_alerts' do
+      command '/bin/env WAIT=1 /usr/lib/redborder/bin/rb_copy_raw_alerts.sh'
+      action :run
+    end
+
+    execute 'rb_configure_ifaces' do
+      command '/bin/env WAIT=1 /usr/lib/redborder/bin/rb_configure_ifaces.sh'
+      run_action :run
+    end
 
     groups.each do |group|
       group_name = group['name']
@@ -41,30 +40,7 @@ action :add do
         .sort
         .map(&:to_s)
         .each do |id_str|
-        vgroup         = group['bindings'][id_str].to_hash.clone
-        vgroup_name    = vgroup['name'].nil? ? 'default' : vgroup['name'].to_s
-        vgroup['name'] = vgroup_name
-        binding_id     = id_str.to_i
-        vgroup['id']   = binding_id
-
-        has_vlans   = vgroup['vlan_objects'] && !vgroup['vlan_objects'].empty?
-        has_network = vgroup['network_objects'] && !vgroup['network_objects'].empty?
-
-        if !has_vlans && !has_network
-          if default_added
-            next
-          else
-            default_added = true
-          end
-        end
-
-        if vgroup['ipvars'].nil? || vgroup['ipvars'].empty?
-          vgroup['ipvars'] = node['redborder']['snort']['default']['ipvars']
-        end
-
-        if vgroup['portvars'].nil? || vgroup['portvars'].empty?
-          vgroup['portvars'] = node['redborder']['snort']['default']['portvars']
-        end
+        default_added, binding_id, vgroup = configure_group(group, node, default_added, id_str)
 
         instance_name = "#{group['instances_group']}_#{group['name']}_#{binding_id}"
         valid_instance_names << "snort3@#{instance_name}.service"
@@ -72,6 +48,7 @@ action :add do
         service "snort3@#{instance_name}.service" do
           action [:enable]
         end
+
         %w(reload restart stop start).each do |s_action|
           execute "#{s_action}_snort3@#{instance_name}" do
             command "/bin/env WAIT=1 /bin/systemctl #{s_action} snort3@#{instance_name}.service"
@@ -96,58 +73,6 @@ action :add do
           action :create
         end
 
-        ruby_block 'copy_alerts_raw' do
-          block do
-            timestamp = Time.now.strftime('%Y-%m-%d_%H')
-
-            system(<<-EOS
-              find /etc/snort -type d \\( -path '*/raw*' -o -path '*/.*' \\) -prune -o -type d -print | while read src_dir; do
-                cd "$src_dir" || continue
-
-                files=$(ls *_alert_full.txt 2>/dev/null)
-                [ -z "$files" ] && continue
-
-                raw_dir="$src_dir/raw"
-                dest_dir="$raw_dir/#{timestamp}"
-
-                mkdir -p "$dest_dir"
-
-                for file in $files; do
-                  [ -e "$file" ] || continue
-
-                  base_name="$(basename "$file")"
-                  name="${base_name%.*}"
-                  ext="${base_name##*.}"
-
-                  dest_file="$dest_dir/$base_name"
-
-                  if [ -e "$dest_file" ]; then
-                    i=1
-                    while [ -e "$dest_dir/${name}_$i.$ext" ]; do
-                      i=$((i + 1))
-                    done
-                    dest_file="$dest_dir/${name}_$i.$ext"
-                  fi
-
-                  cp -f "$file" "$dest_file"
-                  : > "$file"
-                  echo "Copied $file to $dest_file and truncated original"
-                done
-
-                find "$dest_dir" -type f -size 0 -name '*.txt' -delete
-              done
-            EOS
-                  )
-          end
-          action :run
-        end
-
-        begin
-          sensor_id = node['redborder']['sensor_id'].to_i
-        rescue
-          sensor_id = 0
-        end
-
         template "/etc/snort/#{instance_name}/config.lua" do
           source 'config.lua.erb'
           cookbook 'snort3'
@@ -155,7 +80,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(instance_name: instance_name, group: group, sensor_id: sensor_id, group_name: group_name, ml_detection_threshold: ml_detection_threshold, ml_detection_enabled: ml_detection_enabled, ml_detection_uri_depth: ml_detection_uri_depth, ml_detection_client_body_depth: ml_detection_client_body_depth)
+          variables(instance_name: instance_name, group: group, sensor_id: get_sensor_id(node), group_name: group_name, ml_detection_threshold: ml_actions[:ml_detection_threshold], ml_detection_enabled: ml_actions[:ml_detection_enabled], ml_detection_uri_depth: ml_actions[:ml_detection_uri_depth], ml_detection_client_body_depth: ml_actions[:ml_detection_client_body_depth])
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
@@ -247,7 +172,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(segment: segment, autobypass: autobypass, iface: iface, cpu_cores: cpu_cores, threads: threads, mode: mode, inline: inline, args: args, output_plugin: output_plugin)
+          variables(segment: instance_params[:segment], autobypass: get_autobypass(group), iface: instance_params[:iface], cpu_cores: instance_params[:cpu_cores], threads: instance_params[:threads], mode: instance_params[:mode], inline: instance_params[:inline], args: args, output_plugin: get_output_plugin(node))
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
@@ -262,10 +187,6 @@ action :add do
           not_if { ::File.exist?("/etc/snort/#{instance_name}/snort.rules") && !::File.zero?("/etc/snort/#{instance_name}/snort.rules") }
         end
 
-        if mode == 'IDS' || mode == 'IDS_SPAN' || mode == 'IDS_FWD'
-          ml_detection_action = 'alert'
-        end
-
         template "/etc/snort/#{instance_name}/ml.rules" do
           source 'ml.rules.erb'
           cookbook 'snort3'
@@ -273,7 +194,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(ml_detection_action: ml_detection_action)
+          variables(ml_detection_action: get_ml_detection_action(instance_params[:mode]))
         end
 
         template "/etc/snort/#{instance_name}/events.lua" do
