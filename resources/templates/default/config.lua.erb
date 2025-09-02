@@ -5,7 +5,23 @@
 daq = {
     module_dirs = {
         "/usr/lib64/daq"
+    },
+    <%
+        interfaces = []
+        @group['bindings'].each do |binding_id, binding_data|
+            binding_data['interfaces'].each do |iface|
+                interfaces << iface
+            end
+        end
+        interfaces.uniq!
+    %>
+    <% if !interfaces.empty? %>
+    inputs = {
+        <% interfaces.each do |iface| %>
+        "<%= iface %>",
+        <% end %>
     }
+    <% end %>
 }
 
 ---------------------------------------------------------------------------
@@ -131,6 +147,9 @@ binder =
     { when = { service = 'telnet' },           use = { type = 'telnet' } },
 
     { use = { type = 'wizard' } }
+    <% @group['bindings'].each do |binding_id, binding_data| %>
+    { when = { intfs = "<%= binding_data['interfaces'].join(' ') %>" }, use = { type = 'wizard' } },
+    <% end %>
 }
 
 ---------------------------------------------------------------------------
