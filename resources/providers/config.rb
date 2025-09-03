@@ -152,6 +152,18 @@ action :add do
                           'alert_kafka'
                         end
 
+        instance_params = {
+          segment: segment,
+          autobypass: group['autobypass'],
+          iface: iface,
+          cpu_cores: cpu_cores,
+          threads: threads,
+          mode: mode,
+          inline: inline,
+          args: args,
+          output_plugin: output_plugin
+        }
+
         ruby_block "disable_receive_offload_on_#{instance_name}" do
           block do
             interfaces = iface.include?(':') ? iface.split(':') : [iface]
@@ -172,7 +184,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(segment: instance_params[:segment], autobypass: get_autobypass(group), iface: instance_params[:iface], cpu_cores: instance_params[:cpu_cores], threads: instance_params[:threads], mode: instance_params[:mode], inline: instance_params[:inline], args: args, output_plugin: get_output_plugin(node))
+          variables(instance_params)
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
