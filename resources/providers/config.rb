@@ -164,6 +164,7 @@ action :add do
         end
 
         autobypass = group['autobypass'] ? 1 : 0
+        instance_params = get_instance_parameters(group)
 
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
