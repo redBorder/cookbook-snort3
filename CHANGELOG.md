@@ -1,6 +1,16 @@
 cookbook-snort3 CHANGELOG
 ===============
 
+## 1.1.2
+
+  - Rafael Gomez
+    - [ba9439c] define instance_params
+
+## 1.1.1
+
+  - Miguel Alvarez
+    - [7e3a3d3] Major refactor for snort3 cookbook (#24)
+
 ## 1.0.1
 
   - jnavarrorb
