@@ -85,97 +85,20 @@ action :add do
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
 
-        segment = group['segments'].join(' ')
-        iface = `ip link show master #{group['segments'].join(' ')} | grep '^[0-9]' | awk '{print $2}' | cut -d':' -f1 | paste -sd ":"`.chomp!
-        threads = group['cpu_list'].size
-        cpu_cores = group['cpu_list'].join(' ')
-        mode = group['mode']
-        inline = (mode != 'IDS' && mode != 'IDS_SPAN') && (mode == 'IPS' || mode == 'IDS_FWD' || mode == 'IPS_TEST')
+        instance_params = get_instance_parameters(group, vgroup)
 
-        # This should be redborder_afpacket_sbypass_profile
-        case group['pfring_sbypass_profile']
-        when '1' # connectivity
-          sbypass_upper = 60
-          sbypass_lower = 10
-          sbypass_rate  = 5000
-        when '2' # balanced
-          sbypass_upper = 75
-          sbypass_lower = 25
-          sbypass_rate  = 2000
-        when '3' # security
-          sbypass_upper = 90
-          sbypass_lower = 40
-          sbypass_rate  = 2000
-        else
-          sbypass_upper = 0
-          sbypass_lower = 0
-          sbypass_rate  = 0
-        end
+        args = get_snort_args(
+         instance_params[:inline],
+         instance_params[:iface],
+         instance_params[:mode],
+         instance_params[:sbypass_upper],
+         instance_params[:sbypass_lower],
+         instance_params[:sbypass_rate],
+         instance_params[:malware]
+        )
 
-        # This will be for malware
-        malware_file_capture = false
-        args = if inline
-                 args = "--daq redborder_afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}"
-                 args += ' -k none -s 65535' if malware_file_capture
-                 args += " --daq-var sbypassupperthreshold=#{sbypass_upper}"
-                 args += " --daq-var sbypasslowerthreshold=#{sbypass_lower}"
-                 args += " --daq-var sbypasssamplingrate=#{sbypass_rate}"
-                 args += ' --treat-drop-as-alert' if mode == 'IDS_FWD' || mode == 'IDS'
-                 args = "--daq redborder_afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}"
-                 args += ' -k none -s 65535' if malware_file_capture
-                 args += " --daq-var sbypassupperthreshold=#{sbypass_upper}"
-                 args += " --daq-var sbypasslowerthreshold=#{sbypass_lower}"
-                 args += " --daq-var sbypasssamplingrate=#{sbypass_rate}"
-                 args += ' --treat-drop-as-alert' if mode == 'IDS_FWD' || mode == 'IDS'
-                 args
-               else
-                 args = "--daq redborder_afpacket --daq-var fanout_type=hash -i #{iface}"
-                 args += ' -k none -s 65535' if malware_file_capture
-                 args += ' --daq-var sbypassupperthreshold=0'
-                 args += ' --daq-var sbypasslowerthreshold=0'
-                 args += ' --daq-var sbypasssamplingrate=0'
-                 args += ' --treat-drop-as-alert' if mode == 'IDS_SPAN' || mode
-                 args = "--daq redborder_afpacket --daq-var fanout_type=hash -i #{iface}"
-                 args += ' -k none -s 65535' if malware_file_capture
-                 args += ' --daq-var sbypassupperthreshold=0'
-                 args += ' --daq-var sbypasslowerthreshold=0'
-                 args += ' --daq-var sbypasssamplingrate=0'
-                 args += ' --treat-drop-as-alert' if mode == 'IDS_SPAN' || mode
-                 args
-               end
-
-        args = "-Q #{args}" if mode == 'IPS'
-        output_plugin = ''
-        output_plugin = if node['redborder']['cloud'] == true || node['redborder']['cloud'].to_s == '1'
-                          'alert_http'
-                        else
-                          'alert_kafka'
-                        end
-
-        instance_params = {
-          segment: segment,
-          autobypass: group['autobypass'],
-          iface: iface,
-          cpu_cores: cpu_cores,
-          threads: threads,
-          mode: mode,
-          inline: inline,
-          args: args,
-          output_plugin: output_plugin
-        }
-
-        ruby_block "disable_receive_offload_on_#{instance_name}" do
-          block do
-            interfaces = iface.include?(':') ? iface.split(':') : [iface]
-            interfaces.each do |intf|
-              Chef::Log.info("Disabling GRO and LRO on #{intf}")
-              system("ethtool -K #{intf} gro off lro off")
-            end
-          end
-          only_if { ::File.exist?("/etc/snort/#{instance_name}/env") }
-        end
-
-        autobypass = group['autobypass'] ? 1 : 0
+        output_plugin = get_output_plugin(node)
+        autobypass = get_autobypass(group)
 
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
@@ -184,7 +107,18 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(instance_params)
+          variables(
+            autobypass: autobypass,
+            iface: instance_params[:iface],
+            cpu_cores: instance_params[:cpu_cores],
+            threads: instance_params[:threads],
+            mode: instance_params[:mode],
+            inline: instance_params[:inline],
+            args: args,
+            output_plugin: output_plugin,
+            instance_name: instance_name,
+            group: group
+          )
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
@@ -206,7 +140,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(ml_detection_action: get_ml_detection_action(instance_params[:mode]))
+          variables(ml_detection_action: get_ml_detection_action(mode))
         end
 
         template "/etc/snort/#{instance_name}/events.lua" do
@@ -273,7 +207,7 @@ action :add do
 
     ruby_block 'check_running_snort3_services' do
       block do
-        running_services = `systemctl list-units --type=service --state=running | grep snort3 | awk '{print $1}'`.split("\n")
+        running_services = `systemctl list-units --type=service --state=running | grep snort3 | awk u'{print $1}'u`.split("")
         invalid_services = running_services - valid_instance_names
 
         Chef::Log.info("Running snort3 services: #{running_services}")
