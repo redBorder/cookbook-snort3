@@ -7,13 +7,7 @@ daq = {
         "/usr/lib64/daq"
     },
     <%
-        interfaces = []
-        @group['bindings'].each do |binding_id, binding_data|
-            binding_data['interfaces'].each do |iface|
-                interfaces << iface
-            end
-        end
-        interfaces.uniq!
+        interfaces = @group['bindings'].values.map { |binding_data| binding_data['interface'] }.uniq
     %>
     <% if !interfaces.empty? %>
     inputs = {
@@ -147,8 +141,11 @@ binder =
     { when = { service = 'telnet' },           use = { type = 'telnet' } },
 
     { use = { type = 'wizard' } }
-    <% @group['bindings'].each do |binding_id, binding_data| %>
-    { when = { intfs = "<%= binding_data['interfaces'].join(' ') %>" }, use = { type = 'wizard' } },
+    <%
+      @group['bindings'].each_with_index do |(binding_id, binding_data), index|
+        is_last = index == @group['bindings'].size - 1
+    %>
+    { when = { intfs = "<%= binding_data['interface'] %>" }, use = { type = 'wizard' } }<%= is_last ? '' : ',' %>
     <% end %>
 }
 
