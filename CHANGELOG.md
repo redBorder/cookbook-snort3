@@ -1,6 +1,17 @@
 cookbook-snort3 CHANGELOG
 ===============
 
+## 1.1.3
+
+  - Miguel Álvarez
+    - [f99f70b] Fix metadata and CHANGELOG
+    - [44940d6] Fix merge
+
+## 1.1.2
+
+  - Rafael Gomez
+    - [ba9439c] define instance_params
+
 ## 1.1.1
 
   - Miguel Alvarez
