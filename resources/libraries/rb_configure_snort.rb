@@ -57,9 +57,8 @@ module Snort3
       group['autobypass'] ? 1 : 0
     end
 
-    def get_instance_parameters(group)
-      segment = group['segments'].join(' ')
-      iface = `ip link show master #{group['segments'].join(' ')} | grep '^[0-9]' | awk '{print $2}' | cut -d':' -f1 | paste -sd ":"`.chomp!
+    def get_instance_parameters(group, vgroup)
+      iface = vgroup['interface']
       threads = group['cpu_list'].size
       cpu_cores = group['cpu_list'].join(' ')
       mode = group['mode']
@@ -68,7 +67,6 @@ module Snort3
       sbypass_upper, sbypass_lower, sbypass_rate = get_software_bypass(group)
 
       {
-        segment: segment,
         iface: iface,
         threads: threads,
         cpu_cores: cpu_cores,
