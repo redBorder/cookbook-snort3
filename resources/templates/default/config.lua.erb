@@ -145,7 +145,7 @@ binder =
       @group['bindings'].each_with_index do |(binding_id, binding_data), index|
         is_last = index == @group['bindings'].size - 1
     %>
-    { when = { intfs = "<%= binding_data['interface'] %>" }, use = { type = 'wizard' } }<%= is_last ? '' : ',' %>
+    { when = { intfs = { "<%= binding_data['interface'] %>" } }, use = { type = 'wizard' } }<%= is_last ? '' : ',' %>
     <% end %>
 }
 
