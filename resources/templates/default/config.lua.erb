@@ -140,7 +140,7 @@ binder =
     { when = { service = 's7commplus' },       use = { type = 's7commplus' } },
     { when = { service = 'telnet' },           use = { type = 'telnet' } },
 
-    { use = { type = 'wizard' } }
+    { use = { type = 'wizard' } }<% if @group['bindings'] && !@group['bindings'].empty? %>,<% end %>
     <%
       @group['bindings'].each_with_index do |(binding_id, binding_data), index|
         is_last = index == @group['bindings'].size - 1
