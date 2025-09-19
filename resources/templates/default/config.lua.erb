@@ -6,14 +6,9 @@ daq = {
     module_dirs = {
         "/usr/lib64/daq"
     },
-    <%
-        interfaces = @group['bindings'].values.map { |binding_data| binding_data['interface'] }.uniq
-    %>
-    <% if !interfaces.empty? %>
+    <% if @group['interface'] %>
     inputs = {
-        <% interfaces.each do |iface| %>
-        "<%= iface %>",
-        <% end %>
+        "<%= @group['interface'] %>",
     }
     <% end %>
 }
@@ -140,12 +135,9 @@ binder =
     { when = { service = 's7commplus' },       use = { type = 's7commplus' } },
     { when = { service = 'telnet' },           use = { type = 'telnet' } },
 
-    { use = { type = 'wizard' } }<% if @group['bindings'] && !@group['bindings'].empty? %>,<% end %>
-    <%
-      @group['bindings'].each_with_index do |(binding_id, binding_data), index|
-        is_last = index == @group['bindings'].size - 1
-    %>
-    { when = { intfs = { "<%= binding_data['interface'] %>" } }, use = { type = 'wizard' } }<%= is_last ? '' : ',' %>
+    { use = { type = 'wizard' } }<% if @group['interface'] %>,<% end %>
+    <% if @group['interface'] %>
+    { when = { intfs = { "<%= @group['interface'] %>" } }, use = { type = 'wizard' } }
     <% end %>
 }
 
@@ -199,6 +191,8 @@ ips =
         }
     }
 }
+
+ips.rules = [[ include /etc/snort/<%=@instance_name%>/snort.rules ]]
 
 -- use these to configure additional rule actions
 -- react = { }
