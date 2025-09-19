@@ -80,25 +80,22 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(instance_name: instance_name, group: group, sensor_id: get_sensor_id(node), group_name: group_name, ml_detection_threshold: ml_actions[:ml_detection_threshold], ml_detection_enabled: ml_actions[:ml_detection_enabled], ml_detection_uri_depth: ml_actions[:ml_detection_uri_depth], ml_detection_client_body_depth: ml_actions[:ml_detection_client_body_depth])
+          variables(instance_name: instance_name, group: vgroup, sensor_id: get_sensor_id(node), group_name: group_name, ml_detection_threshold: ml_actions[:ml_detection_threshold], ml_detection_enabled: ml_actions[:ml_detection_enabled], ml_detection_uri_depth: ml_actions[:ml_detection_uri_depth], ml_detection_client_body_depth: ml_actions[:ml_detection_client_body_depth])
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
 
-        instance_params = get_instance_parameters(group, vgroup)
+        instance_params = get_instance_parameters(group)
 
         args = get_snort_args(
-         instance_params[:inline],
-         instance_params[:iface],
-         instance_params[:mode],
-         instance_params[:sbypass_upper],
-         instance_params[:sbypass_lower],
-         instance_params[:sbypass_rate],
-         instance_params[:malware]
+          instance_params[:inline],
+          instance_params[:iface],
+          instance_params[:mode],
+          instance_params[:sbypass_upper],
+          instance_params[:sbypass_lower],
+          instance_params[:sbypass_rate],
+          instance_params[:malware]
         )
-
-        output_plugin = get_output_plugin(node)
-        autobypass = get_autobypass(group)
 
         template "/etc/snort/#{instance_name}/env" do
           source 'env.erb'
@@ -107,18 +104,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(
-            autobypass: autobypass,
-            iface: instance_params[:iface],
-            cpu_cores: instance_params[:cpu_cores],
-            threads: instance_params[:threads],
-            mode: instance_params[:mode],
-            inline: instance_params[:inline],
-            args: args,
-            output_plugin: output_plugin,
-            instance_name: instance_name,
-            group: group
-          )
+          variables(segment: instance_params[:segment], autobypass: get_autobypass(group), iface: instance_params[:iface], cpu_cores: instance_params[:cpu_cores], threads: instance_params[:threads], mode: instance_params[:mode], inline: instance_params[:inline], args: args, output_plugin: get_output_plugin(node))
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
@@ -140,7 +126,7 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(ml_detection_action: get_ml_detection_action(mode))
+          variables(ml_detection_action: get_ml_detection_action(instance_params[:mode]))
         end
 
         template "/etc/snort/#{instance_name}/events.lua" do
@@ -207,7 +193,7 @@ action :add do
 
     ruby_block 'check_running_snort3_services' do
       block do
-        running_services = `systemctl list-units --type=service --state=running | grep snort3 | awk u'{print $1}'u`.split("")
+        running_services = `systemctl list-units --type=service --state=running | grep snort3 | awk '{print $1}'`.split("\n")
         invalid_services = running_services - valid_instance_names
 
         Chef::Log.info("Running snort3 services: #{running_services}")
