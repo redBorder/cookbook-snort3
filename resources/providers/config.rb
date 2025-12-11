@@ -21,6 +21,14 @@ action :add do
 
     valid_instance_names = []
 
+    directory '/root/snort' do
+        owner 'root'
+        group 'root'
+        mode '0755'
+        recursive true
+        action :create
+    end
+
     execute 'rb_copy_raw_alerts' do
       command '/bin/env WAIT=1 /usr/lib/redborder/bin/rb_copy_raw_alerts.sh'
       action :run
@@ -29,6 +37,33 @@ action :add do
     execute 'rb_configure_ifaces' do
       command '/bin/env WAIT=1 /usr/lib/redborder/bin/rb_configure_ifaces.sh'
       run_action :run
+    end
+
+    template '/etc/snort/snort.lua' do
+      source 'snort_global.lua.erb'
+      cookbook 'snort3'
+      owner 'root'
+      group 'root'
+      mode '0644'
+      retries 2
+      variables(
+        s3_enable: new_resource.enable_s3,
+        s3_bucket: new_resource.s3_bucket,
+        s3_region: new_resource.s3_region,
+        s3_endpoint: new_resource.s3_endpoint,
+        s3_access_key_id: new_resource.s3_access_key_id,
+        s3_secret_key_id: new_resource.s3_secret_key_id,
+        s3_verify_ssl: new_resource.s3_verify_ssl,
+        s3_https_scheme: new_resource.s3_https_scheme,
+        s3_use_real_name: new_resource.s3_use_real_name,
+        rules_file: new_resource.rules_file,
+        capture_memcap: new_resource.capture_memcap,
+        capture_max_size: new_resource.capture_max_size,
+        capture_min_size: new_resource.capture_min_size,
+        capture_block_size: new_resource.capture_block_size,
+        max_files_cached: new_resource.max_files_cached,
+        show_data_depth: new_resource.show_data_depth
+      )
     end
 
     groups.each do |group|
@@ -80,12 +115,43 @@ action :add do
           group 'root'
           mode '0644'
           retries 2
-          variables(instance_name: instance_name, group: group, sensor_id: get_sensor_id(node), group_name: group_name, ml_detection_threshold: ml_actions[:ml_detection_threshold], ml_detection_enabled: ml_actions[:ml_detection_enabled], ml_detection_uri_depth: ml_actions[:ml_detection_uri_depth], ml_detection_client_body_depth: ml_actions[:ml_detection_client_body_depth])
+          variables(
+            instance_name: instance_name,
+            group: group,
+            sensor_id: get_sensor_id(node),
+            group_name: group_name,
+            ml_detection_threshold: ml_actions[:ml_detection_threshold],
+            ml_detection_enabled: ml_actions[:ml_detection_enabled],
+            ml_detection_uri_depth: ml_actions[:ml_detection_uri_depth],
+            ml_detection_client_body_depth: ml_actions[:ml_detection_client_body_depth],
+            s3_enable: new_resource.enable_s3,
+            s3_bucket: new_resource.s3_bucket,
+            s3_region: new_resource.s3_region,
+            s3_endpoint: new_resource.s3_endpoint,
+            s3_access_key_id: new_resource.s3_access_key_id,
+            s3_secret_key_id: new_resource.s3_secret_key_id,
+            s3_verify_ssl: new_resource.s3_verify_ssl,
+            s3_https_scheme: new_resource.s3_https_scheme,
+            s3_use_real_name: new_resource.s3_use_real_name,
+            file_log_pkt_time: node.dig('redborder', 'snort', 'file_log', 'log_pkt_time') || true,
+            file_log_sys_time: node.dig('redborder', 'snort', 'file_log', 'log_sys_time') || false,
+            output_logdir: node.dig('redborder', 'snort', 'output', 'logdir') || '/root/snort',
+            rules_file: new_resource.rules_file,
+            capture_memcap: new_resource.capture_memcap,
+            capture_max_size: new_resource.capture_max_size,
+            capture_min_size: new_resource.capture_min_size,
+            capture_block_size: new_resource.capture_block_size,
+            max_files_cached: new_resource.max_files_cached,
+            show_data_depth: new_resource.show_data_depth
+          )
           notifies :stop, "service[snort3@#{instance_name}.service]", :delayed
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
 
+
+
         instance_params = get_instance_parameters(group)
+        instance_params[:malware] = false
 
         args = get_snort_args(
           instance_params[:inline],
@@ -94,7 +160,8 @@ action :add do
           instance_params[:sbypass_upper],
           instance_params[:sbypass_lower],
           instance_params[:sbypass_rate],
-          instance_params[:malware]
+          instance_params[:malware],
+          new_resource.enable_s3
         )
 
         template "/etc/snort/#{instance_name}/env" do
