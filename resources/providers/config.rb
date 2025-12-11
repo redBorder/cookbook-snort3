@@ -148,8 +148,6 @@ action :add do
           notifies :start, "service[snort3@#{instance_name}.service]", :delayed
         end
 
-
-
         instance_params = get_instance_parameters(group)
         instance_params[:malware] = false
 
