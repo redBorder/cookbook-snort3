@@ -72,6 +72,41 @@ ftp_data = { }
 http_inspect = { }
 http2_inspect = { }
 
+<% if @s3_enable %>
+file_id = {
+    rules_file = '<%= @rules_file %>',
+    capture_memcap = <%= @capture_memcap %>,
+    capture_max_size = <%= @capture_max_size %>,
+    capture_min_size = <%= @capture_min_size %>,
+    capture_block_size = <%= @capture_block_size %>,
+    access_key_id = "<%= @s3_access_key_id %>",
+    secret_access_key = "<%= @s3_secret_key_id %>",
+    region = "<%= @s3_region %>",
+    bucket_name = "<%= @s3_bucket %>",
+    endpoint = "<%= @s3_endpoint %>:9000",
+    verify_ssl = <%= @s3_verify_ssl %>,
+    enable_s3 = <%= @s3_enable %>,
+    https_scheme = <%= @s3_https_scheme %>,
+    use_real_name = <%= @s3_use_real_name %>
+}
+
+<% end %>
+
+file_policy = {
+    enable_type = true,
+    enable_signature = true,
+    enable_capture = true
+}
+
+file_log = {
+    log_pkt_time = <%= @file_log_pkt_time %>,
+    log_sys_time = <%= @file_log_sys_time %>
+}
+
+output = {
+    logdir = '<%= @output_logdir %>'
+}
+
 <% if File.exist?('/usr/share/GeoIP/GeoLite2-Country.mmdb') %>
 reputation = {
   allow = 'trust',
