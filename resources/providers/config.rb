@@ -22,11 +22,11 @@ action :add do
     valid_instance_names = []
 
     directory '/root/snort' do
-        owner 'root'
-        group 'root'
-        mode '0755'
-        recursive true
-        action :create
+      owner 'root'
+      group 'root'
+      mode '0755'
+      recursive true
+      action :create
     end
 
     execute 'rb_copy_raw_alerts' do
