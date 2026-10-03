@@ -1,6 +1,11 @@
 cookbook-snort3 CHANGELOG
 ===============
 
+## 1.1.4
+
+  - manegron
+    - [7023e7c] Upload cookbook only if opscode-erchef is active
+
 ## 1.1.3
 
   - Miguel Álvarez
