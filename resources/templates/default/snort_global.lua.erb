@@ -2,18 +2,32 @@
 -- Snort++ configuration
 ---------------------------------------------------------------------------
 
-daq = {
-    module_dirs = {
-        "/usr/lib64/daq"
-    }
-}
+-- there are over 200 modules available to tune your policy.
+-- many can be used with defaults w/o any explicit configuration.
+-- use this conf as a template for your specific configuration.
+
+-- 1. configure defaults
+-- 2. configure inspection
+-- 3. configure bindings
+-- 4. configure performance
+-- 5. configure detection
+-- 6. configure filters
+-- 7. configure outputs
+-- 8. configure tweaks
 
 ---------------------------------------------------------------------------
 -- 1. configure defaults
 ---------------------------------------------------------------------------
 
-include '/etc/snort/<%=@instance_name%>/snort_defaults.lua'
-include '/etc/snort/<%=@instance_name%>/snort-variables.conf'
+-- HOME_NET and EXTERNAL_NET must be set now
+-- setup the network addresses you are protecting
+HOME_NET = 'any'
+
+-- set up the external network addresses.
+-- (leave as "any" in most situations)
+EXTERNAL_NET = 'any'
+
+include 'snort_defaults.lua'
 
 ---------------------------------------------------------------------------
 -- 2. configure inspection
@@ -61,6 +75,7 @@ dce_udp = { }
 dce_http_proxy = { }
 dce_http_server = { }
 
+-- see snort_defaults.lua for default_*
 gtp_inspect = default_gtp
 port_scan = default_med_port_scan
 smtp = default_smtp
@@ -72,14 +87,16 @@ ftp_data = { }
 http_inspect = { }
 http2_inspect = { }
 
-<% if @s3_enable %>
+-- see file_magic.rules for file id rules
 file_id = {
     rules_file = '<%= @rules_file %>',
-    capture_memcap = <%= @capture_memcap %>,
+    capture_memcap = <%= @capture_memcap %>, 
     capture_max_size = <%= @capture_max_size %>,
     capture_min_size = <%= @capture_min_size %>,
     capture_block_size = <%= @capture_block_size %>,
-    access_key_id = "<%= @s3_access_key_id %>",
+    max_files_cached = <%= @max_files_cached %>,
+    show_data_depth = <%= @show_data_depth %>,
+    access_key_id = "<%= @s3_access_key_id %>", 
     secret_access_key = "<%= @s3_secret_key_id %>",
     region = "<%= @s3_region %>",
     bucket_name = "<%= @s3_bucket %>",
@@ -89,34 +106,43 @@ file_id = {
     https_scheme = <%= @s3_https_scheme %>,
     use_real_name = <%= @s3_use_real_name %>
 }
-
-<% end %>
-
-file_policy = {
+file_policy = { 
     enable_type = true,
     enable_signature = true,
-    enable_capture = true
+    enable_capture = true,
+    rules = {
+    }
 }
 
-file_log = {
-    log_pkt_time = <%= @file_log_pkt_time %>,
-    log_sys_time = <%= @file_log_sys_time %>
+file_log = { 
+    log_pkt_time = true,
+    log_sys_time = false
 }
 
 output = {
-    logdir = '<%= @output_logdir %>'
+    logdir = '/root/snort'
 }
 
-<% if File.exist?('/usr/share/GeoIP/GeoLite2-Country.mmdb') %>
-reputation = {
-  allow = 'trust',
-  geoip_db_path = '/usr/share/GeoIP/GeoLite2-Country.mmdb',
-  geoip_manifest_path = '/etc/snort/<%= @instance_name %>/geoips/rbgeoip',
-  allowlist = '/etc/snort/<%= @instance_name %>/iplists/allowlist',
-  blocklist = '/etc/snort/<%= @instance_name %>/iplists/blacklist',
-  monitorlist = '/etc/snort/<%= @instance_name %>/iplists/monitorlist'
+js_norm = default_js_norm
+
+-- the following require additional configuration to be fully effective:
+
+appid =
+{
+    -- appid requires this to use appids in rules
+    --app_detector_dir = 'directory to load appid detectors from'
 }
-<% end %>
+
+--[[
+reputation =
+{
+    -- configure one or both of these, then uncomment reputation
+    -- (see also related path vars at the top of snort_defaults.lua)
+
+    --blacklist = 'blacklist file name with ip lists'
+    --whitelist = 'whitelist file name with ip lists'
+}
+--]]
 
 ---------------------------------------------------------------------------
 -- 3. configure bindings
@@ -188,35 +214,14 @@ classifications = default_classifications
 
 ips =
 {
-    variables =
-    {
-        nets =
-        {
-            EXTERNAL_NET = EXTERNAL_NET,
-            HOME_NET = HOME_NET,
-            HTTP_SERVERS = HTTP_SERVERS,
-            SMTP_SERVERS = SMTP_SERVERS,
-            SQL_SERVERS = SQL_SERVERS,
-            DNS_SERVERS = DNS_SERVERS,
-            TELNET_SERVERS = TELNET_SERVERS,
-            AIM_SERVERS = AIM_SERVERS,
-            SIP_SERVERS = SIP_SERVERS,
-            DNP3_SERVER = DNP3_SERVER,
-            MODBUS_SERVER = MODBUS_SERVER,
-            ENIP_SERVER = ENIP_SERVER,
-        },
-        ports =
-        {
-            HTTP_PORTS = HTTP_PORTS,
-            FTP_PORTS = FTP_PORTS,
-            SSH_PORTS = SSH_PORTS,
-            FILE_DATA_PORTS = FILE_DATA_PORTS,
-            SIP_PORTS = SIP_PORTS,
-            DNP3_PORTS = DNP3_PORTS,
-            ORACLE_PORTS = ORACLE_PORTS,
-            SHELLCODE_PORTS = SHELLCODE_PORTS,
-        }
-    }
+    -- use this to enable decoder and inspector alerts
+    --enable_builtin_rules = true,
+
+    -- use include for rules files; be sure to set your path
+    -- note that rules files can include other rules files
+    -- (see also related path vars at the top of snort_defaults.lua)
+
+    variables = default_variables
 }
 
 -- use these to configure additional rule actions
@@ -227,109 +232,72 @@ ips =
 -- payload_injector = { }
 
 ---------------------------------------------------------------------------
--- 6. configure filters (custom redBorder modifications)
+-- 6. configure filters
 ---------------------------------------------------------------------------
 
-include('/etc/snort/<%=@instance_name%>/events.lua')
+-- below are examples of filters
+-- each table is a list of records
 
-<% if File.exist?("/etc/snort/#{@instance_name}/ml_models/snort.model") and @ml_detection_enabled %>
+--[[
+suppress =
+{
+    -- don't want to any of see these
+    { gid = 1, sid = 1 },
 
-<% if File.size?("/etc/snort/#{@instance_name}/ml_models/snort.model") %>
----------------------------------------------------------------------------
--- LibML. Neural Network Based Exploit Detection
----------------------------------------------------------------------------
+    -- don't want to see anything for a given host
+    { track = 'by_dst', ip = '1.2.3.4' }
 
-snort_ml_engine = {
-  http_param_models = {
-    { path = "/etc/snort/<%= @instance_name %>/ml_models/snort.model" },
-  },
-  ftp_cmd_models = {
-    { path = "/etc/snort/<%= @instance_name %>/ml_models/snort.model" }
-  }
+    -- don't want to see these for a given host
+    { gid = 1, sid = 2, track = 'by_dst', ip = '1.2.3.4' },
 }
+--]]
 
-snort_ml = {
-  http_param_threshold = <%= @ml_detection_threshold %>,
-  ftp_cmd_threshold = 0.01,
-  client_body_depth = <%= @ml_detection_client_body_depth %>,
-  uri_depth = <%= @ml_detection_uri_depth %>,
-  ftp_request_depth = -1,
-  ftp_response_depth = -1
+--[[
+event_filter =
+{
+    -- reduce the number of events logged for some rules
+    { gid = 1, sid = 1, type = 'limit', track = 'by_src', count = 2, seconds = 10 },
+    { gid = 1, sid = 2, type = 'both',  track = 'by_dst', count = 5, seconds = 60 },
 }
-<% end %>
+--]]
 
-<% end %>
+--[[
+rate_filter =
+{
+    -- alert on connection attempts from clients in SOME_NET
+    { gid = 135, sid = 1, track = 'by_src', count = 5, seconds = 1,
+      new_action = 'alert', timeout = 4, apply_to = '[$SOME_NET]' },
+
+    -- alert on connections to servers over threshold
+    { gid = 135, sid = 2, track = 'by_dst', count = 29, seconds = 3,
+      new_action = 'alert', timeout = 1 },
+}
+--]]
+
 ---------------------------------------------------------------------------
 -- 7. configure outputs
 ---------------------------------------------------------------------------
 
-<% if !@sensor_id.nil? and @sensor_id > 0 and !node["redborder"]["sensor_uuid"].nil? %>
-<%
-  # Prepare the 'out' variable with dynamic fields
-  out = [
-    "deployment", "deployment_uuid", "namespace", "namespace_uuid", "market", "market_uuid",
-    "organization", "organization_uuid", "service_provider", "service_provider_uuid"
-  ].map { |x| @group[x].nil? ? "" : "\"#{x}\":\"#{@group[x].to_s}\"" }
-  .select { |x| x != "" }
-  .join(",")
-%>
+-- event logging
+-- you can enable with defaults from the command line with -A <alert_type>
+-- uncomment below to set non-default configs
+--alert_csv = { }
+--alert_fast = { }
+--alert_full = { }
+--alert_sfsocket = { }
+--alert_syslog = { }
+--unified2 = { }
 
-<%
-  enrichment_json = "{"
-  enrichment_json += out unless out.nil? || out.empty?
-  enrichment_json += "," unless out.nil? || out.empty?
-  enrichment_json += "\"sensor_uuid\":\"#{node['redborder']['sensor_uuid']}\","
-  enrichment_json += "\"sensor_name\":\"#{node['rbname']}\","
-  enrichment_json += "\"group_uuid\":\"#{@group['group_uuid'].nil? ? '0' : @group['group_uuid']}\","
-  enrichment_json += "\"group_name\":\"#{@group_name.nil? ? 'default' : @group_name}\","
-  enrichment_json += "\"sensor_type\":\"ips\","
-  enrichment_json += "\"domain_name\":\"#{@group['domain_name'].nil? ? '0' : @group['domain_name']}\","
-  enrichment_json += "\"sensor_ip\":\"#{node['ipaddress']}\""
-  enrichment_json += "}"
-%>
+-- packet logging
+-- you can enable with defaults from the command line with -L <log_type>
+--log_codecs = { }
+--log_hext = { }
+--log_pcap = { }
 
-<% end %>
+-- additional logs
+--packet_capture = { }
+--file_log = { }
 
----------------------------------------------------------------------------
--- Search Engine
----------------------------------------------------------------------------
-
-search_engine = { search_method = 'hyperscan'}
-
-<%#— pick mode based on cloud flag —%>
-<% if node["redborder"]["cloud"] == true || node["redborder"]["cloud"].to_s == "1" %>
-
----------------------------------------------------------------------------
---- HTTP output plugin
----------------------------------------------------------------------------
-
-alert_http = {
-    http_endpoint =  "https://http2k.<%= node["redborder"]["cdomain"] %>/rbdata/<%= node["redborder"]["sensor_uuid"] %>/rb_event",
-    mac_vendors =   "/etc/macvendors/mac_vendors",
-    verify_ssl =     false,
-    mode =                "bulk",
-    bulk_queue_size =      500,
-    max_queue_flush_time = 60000,
-    enrichment =    '<%= enrichment_json %>',
-    fields = 'src dst priority src_country_code dst_country_code sig_id ethlength_range sig_generator action msg class src_port dst_port eth_dst_mac eth_src_mac eth_dst eth_src vlan iplen udplen'
-}
-
-<% else %>
-
----------------------------------------------------------------------------
---- kafka output plugin
----------------------------------------------------------------------------
-
-alert_kafka = {
-    file = true,
-    topic =         "rb_event",
-    mac_vendors =   "/etc/macvendors/mac_vendors",
-    broker_host =   "kafka.<%= node["redborder"]["cdomain"] %>:9092",
-    enrichment =    '<%= enrichment_json %>',
-    fields = 'src dst priority src_country_code dst_country_code sig_id ethlength_range sig_generator action msg class src_port dst_port eth_dst_mac eth_src_mac eth_dst eth_src vlan iplen udplen'
-}
-
-<% end %>
 ---------------------------------------------------------------------------
 -- 8. configure tweaks
 ---------------------------------------------------------------------------

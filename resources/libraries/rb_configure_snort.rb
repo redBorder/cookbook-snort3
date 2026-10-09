@@ -1,9 +1,9 @@
 module Snort3
   module Helpers
-    def get_snort_args(inline, iface, mode, sbypass_upper, sbypass_lower, sbypass_rate, malware_file_capture)
+    def get_snort_args(inline, iface, mode, sbypass_upper, sbypass_lower, sbypass_rate, malware_file_capture, s3_enabled)
       args = if inline
                args = "--daq redborder_afpacket --daq-mode inline --daq-var fanout_type=hash -i #{iface}"
-               args += ' -k none -s 65535' if malware_file_capture
+               args += ' -k none -s 65535' if malware_file_capture || s3_enabled
                args += " --daq-var sbypassupperthreshold=#{sbypass_upper}"
                args += " --daq-var sbypasslowerthreshold=#{sbypass_lower}"
                args += " --daq-var sbypasssamplingrate=#{sbypass_rate}"
@@ -11,7 +11,7 @@ module Snort3
                args
              else
                args = "--daq redborder_afpacket --daq-var fanout_type=hash -i #{iface}"
-               args += ' -k none -s 65535' if malware_file_capture
+               args += ' -k none -s 65535' if malware_file_capture || s3_enabled
                args += ' --daq-var sbypassupperthreshold=0'
                args += ' --daq-var sbypasslowerthreshold=0'
                args += ' --daq-var sbypasssamplingrate=0'
